@@ -45,6 +45,7 @@ class SecurityConfig {
                     authenticated
                 }
                 authorize("/", permitAll)
+                authorize("/404", permitAll)
                 authorize("/index.html", permitAll)
                 authorize("/sw.js", permitAll)
                 authorize("/static-cc9fff6d.bundle", permitAll)

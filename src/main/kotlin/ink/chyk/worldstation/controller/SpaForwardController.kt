@@ -5,9 +5,16 @@ import org.springframework.web.bind.annotation.RequestMapping
 
 @Controller
 class SpaForwardController {
-    @RequestMapping(value = ["/{path:[^\\.]*}"])
+    @RequestMapping(
+        value = [
+            "/",
+            "/404",
+            "/upload/worldmap",
+            "/upload/image",
+            "/edit",
+        ]
+    )
     fun forward(): String {
-        return "forward:/static/index.html"
+        return "forward:/index.html"
     }
 }
-

@@ -9,6 +9,14 @@ spring:
   mvc:
     async:
       request-timeout: -1
+  web:
+    resources:
+      static-locations:
+        - file:./static/
+        - classpath:/META-INF/resources/
+        - classpath:/resources/
+        - classpath:/static/
+        - classpath:/public/
 
 springdoc:
     api-docs:
