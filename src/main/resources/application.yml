@@ -6,6 +6,10 @@ spring:
       enabled: true
       max-file-size: 1024MB
       max-request-size: 1024MB
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
   mvc:
     async:
       request-timeout: -1
@@ -29,3 +33,13 @@ server:
     connection-timeout: 2h
     keep-alive-timeout: 2h
     max-swallow-size: -1
+
+worldstation:
+  upload:
+    temp-dir: ./upload-tmp
+    chunk-size: 8388608
+    stream-start-window-chunks: 4
+    chunk-wait-timeout-seconds: 60
+    session-ttl-hours: 24
+    max-active-sessions-per-user: 2
+    keep-chunks-until-completed: true

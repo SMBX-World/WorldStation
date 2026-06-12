@@ -43,6 +43,10 @@ dependencies {
     implementation("org.jetbrains.exposed:exposed-jdbc:1.0.0-beta-2")
     implementation("org.jetbrains.exposed:exposed-spring-boot-starter:1.0.0-beta-2")
 
+    // 数据库迁移
+    implementation("org.flywaydb:flyway-core")
+    runtimeOnly("org.flywaydb:flyway-database-postgresql")
+
     // PostgreSQL
     runtimeOnly("org.postgresql:postgresql")
 }

@@ -3,8 +3,10 @@ package ink.chyk.worldstation.configuration
 import ink.chyk.worldstation.util.PageRequestMatcher
 import org.springframework.context.annotation.*
 import org.springframework.http.HttpMethod
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.security.config.annotation.web.builders.*
 import org.springframework.security.config.annotation.web.configuration.*
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
 import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.config.annotation.web.invoke
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository
@@ -25,7 +27,10 @@ class SecurityConfig {
     }
 
     @Bean
-    fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
+    fun securityFilterChain(
+        http: HttpSecurity,
+        clientRegistrationRepository: ObjectProvider<ClientRegistrationRepository>
+    ): SecurityFilterChain {
         // fixes from https://stackoverflow.com/questions/74447118/csrf-protection-not-working-with-spring-security-6
 
         // 修复 Spring Security 6 中，默认不提供 CSRF 令牌的问题
@@ -62,7 +67,7 @@ class SecurityConfig {
                 authorize("/docs/**", permitAll)
                authorize(anyRequest, authenticated2) // 需要认证的请求
             }
-            if (!DEBUG_DISABLE_WEB_SECURITY) {
+            if (!DEBUG_DISABLE_WEB_SECURITY && clientRegistrationRepository.getIfAvailable() != null) {
                 oauth2Login {
                     defaultSuccessUrl("/", true)
                 }

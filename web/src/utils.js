@@ -61,24 +61,65 @@ const DOWNLOAD_PROVIDER_INFO = {
   }
 }
 
-async function uploadFile(file, fileName, uploadKind, onProgress) {
+function apiResponse(data, status = 200, statusText = "OK") {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    statusText,
+    text: () => Promise.resolve(JSON.stringify(data)),
+    json: () => Promise.resolve(data)
+  }
+}
+
+async function requestJson(url, options = {}) {
+  const headers = {
+    ...(options.headers || {}),
+    'X-XSRF-TOKEN': getXsrfToken()
+  }
+  const response = await fetch(url, {
+    ...options,
+    headers
+  })
+  const data = await response.json()
+  if (!response.ok || data.code !== 0) {
+    const error = new Error(data.message || response.statusText || '请求失败')
+    error.status = response.status
+    error.data = data
+    throw error
+  }
+  return data.data
+}
+
+async function sha256Hex(blob) {
+  const buffer = await blob.arrayBuffer()
+  const hash = await crypto.subtle.digest('SHA-256', buffer)
+  return [...new Uint8Array(hash)]
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function uploadChunk(uploadId, chunkIndex, chunk, file, chunkSize, checksum, confirmedBytes, onProgress) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
 
-    const filename = encodeURIComponent(fileName);
-
-    xhr.open('PUT', `/api/onedrive/upload?upload_kind=${uploadKind}&file_name=${filename}`, true)
+    xhr.open('PUT', `/api/onedrive/uploads/${uploadId}/chunks/${chunkIndex}`, true)
 
     const xsrfToken = getXsrfToken()
+    const start = chunkIndex * chunkSize
+    const end = start + chunk.size - 1
 
-    // 设置自定义头部
     xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
     xhr.setRequestHeader('X-XSRF-TOKEN', xsrfToken)
+    xhr.setRequestHeader('Content-Range', `bytes ${start}-${end}/${file.size}`)
+    xhr.setRequestHeader('X-Chunk-SHA256', checksum)
 
-    // 进度处理
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) {
-        const percentComplete = Math.round((event.loaded / event.total) * 100);
+        const percentComplete = Math.min(99, Math.round(((confirmedBytes + event.loaded) / file.size) * 99));
         if (onProgress) {
           onProgress(percentComplete);
         }
@@ -86,34 +127,19 @@ async function uploadFile(file, fileName, uploadKind, onProgress) {
     };
 
     xhr.onload = () => {
+      let data = null
+      try {
+        data = JSON.parse(xhr.responseText)
+      } catch (_) {
+        data = {code: xhr.status, message: '解析JSON失败'}
+      }
       if (xhr.status >= 200 && xhr.status < 300) {
-        resolve({
-          ok: true,
-          status: xhr.status,
-          statusText: xhr.statusText,
-          text: () => Promise.resolve(xhr.responseText),
-          json: () => {
-            try {
-              return Promise.resolve(JSON.parse(xhr.responseText));
-            } catch (e) {
-              return Promise.reject(new Error('解析JSON失败'));
-            }
-          }
-        });
+        resolve(data);
       } else {
-        resolve({
-          ok: false,
-          status: xhr.status,
-          statusText: xhr.statusText,
-          text: () => Promise.resolve(xhr.responseText),
-          json: () => {
-            try {
-              return Promise.resolve(JSON.parse(xhr.responseText));
-            } catch (e) {
-              return Promise.reject(new Error('解析JSON失败'));
-            }
-          }
-        });
+        const error = new Error(data.message || xhr.statusText || '上传分块失败')
+        error.status = xhr.status
+        error.data = data
+        reject(error)
       }
     };
 
@@ -121,9 +147,113 @@ async function uploadFile(file, fileName, uploadKind, onProgress) {
       reject(new Error('上传请求失败'));
     };
 
-    // 发送文件
-    xhr.send(file);
+    xhr.send(chunk);
   });
+}
+
+async function uploadChunkWithRetry(uploadId, chunkIndex, chunk, file, chunkSize, confirmedBytes, onProgress) {
+  let lastError = null
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const checksum = await sha256Hex(chunk)
+    try {
+      return await uploadChunk(uploadId, chunkIndex, chunk, file, chunkSize, checksum, confirmedBytes, onProgress)
+    } catch (error) {
+      lastError = error
+      if (error.status !== 422) {
+        throw error
+      }
+      await sleep(500 * (attempt + 1))
+    }
+  }
+  throw lastError
+}
+
+async function waitUploadCompleted(uploadId, onProgress) {
+  while (true) {
+    const status = await requestJson(`/api/onedrive/uploads/${uploadId}`)
+    if (status.status === 'COMPLETED') {
+      if (onProgress) onProgress(100)
+      return status.finalUrl
+    }
+    if (status.status === 'FAILED' || status.status === 'ABORTED' || status.status === 'EXPIRED') {
+      throw new Error(status.error || '服务器处理文件失败')
+    }
+    if (onProgress) {
+      const processingProgress = status.totalChunks > 0
+        ? Math.min(99, Math.round(99 + (status.savedChunkCount / status.totalChunks)))
+        : 99
+      onProgress(processingProgress)
+    }
+    await sleep(2000)
+  }
+}
+
+async function uploadFile(file, fileName, uploadKind, onProgress) {
+  try {
+    if (onProgress) onProgress(0)
+
+    const session = await requestJson('/api/onedrive/uploads', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        uploadKind,
+        fileName,
+        contentType: file.type || 'application/octet-stream',
+        totalSize: file.size
+      })
+    })
+
+    const receivedChunks = new Set(session.receivedChunks || [])
+    let confirmedBytes = 0
+    for (const index of receivedChunks) {
+      const start = index * session.chunkSize
+      const end = Math.min(start + session.chunkSize, file.size)
+      confirmedBytes += end - start
+    }
+
+    for (let index = 0; index < session.totalChunks; index++) {
+      const start = index * session.chunkSize
+      const end = Math.min(start + session.chunkSize, file.size)
+      if (receivedChunks.has(index)) {
+        if (onProgress) onProgress(Math.min(99, Math.round((confirmedBytes / file.size) * 99)))
+        continue
+      }
+
+      const chunk = file.slice(start, end)
+      await uploadChunkWithRetry(
+        session.uploadId,
+        index,
+        chunk,
+        file,
+        session.chunkSize,
+        confirmedBytes,
+        onProgress
+      )
+      confirmedBytes += chunk.size
+      if (onProgress) onProgress(Math.min(99, Math.round((confirmedBytes / file.size) * 99)))
+    }
+
+    const completed = await requestJson(`/api/onedrive/uploads/${session.uploadId}/complete`, {
+      method: 'POST'
+    })
+
+    if (completed.status === 'COMPLETED') {
+      if (onProgress) onProgress(100)
+      return apiResponse({code: 0, message: '文件上传成功', data: completed.finalUrl})
+    }
+
+    if (onProgress) onProgress(99)
+    const finalUrl = await waitUploadCompleted(session.uploadId, onProgress)
+    return apiResponse({code: 0, message: '文件上传成功', data: finalUrl})
+  } catch (error) {
+    return apiResponse({
+      code: error.status || 500,
+      message: error.message || '上传失败',
+      data: null
+    }, error.status || 500, error.message || '上传失败')
+  }
 }
 
 export {
