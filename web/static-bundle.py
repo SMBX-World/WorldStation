@@ -1,7 +1,6 @@
 import struct
 from pathlib import Path
 import json
-import binascii
 
 # 打包所有静态资源
 

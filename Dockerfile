@@ -21,7 +21,7 @@ USER gradle
 RUN gradle build --no-daemon -x test
 
 # 最终镜像
-FROM openjdk:21-jdk-slim
+FROM eclipse-temurin:21-jdk-jammy
 WORKDIR /app
 COPY --from=backend-build /app/build/libs/*.jar app.jar
 COPY --from=frontend-build /app/web/dist/ ./static/
