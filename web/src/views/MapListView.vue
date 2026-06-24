@@ -4,16 +4,17 @@ import Motd from "../components/Motd.vue";
 import FilterBar from "../components/FilterBar.vue";
 import WorldMapList from "../components/WorldMapList.vue";
 import {useUserIdStore} from "../stores/userId.js";
-import NotLoggedInWarning from "../components/NotLoggedInWarning.vue";
 
 const titleFilter = ref("")
 const versionFilter = ref("")
 const userIdFilter = ref(-1)
+const sortFilter = ref("")
 
-function applyFilter(title, version, userId) {
+function applyFilter(title, version, userId, sort) {
   titleFilter.value = title
   versionFilter.value = version
   userIdFilter.value = userId
+  sortFilter.value = sort || ""
 }
 
 const userIdStore = useUserIdStore()
@@ -22,9 +23,8 @@ const userIdStore = useUserIdStore()
 
 <template>
   <Motd />
-  <FilterBar v-if="userIdStore.userId !== -1" @applyFilter="applyFilter" />
-  <NotLoggedInWarning v-else />
-  <WorldMapList :title="titleFilter" :version="versionFilter" :userId="userIdFilter" />
+  <FilterBar :isLoggedIn="userIdStore.isLoggedIn" @applyFilter="applyFilter" />
+  <WorldMapList :title="titleFilter" :version="versionFilter" :userId="userIdFilter" :sort="sortFilter" />
 </template>
 
 <style scoped>

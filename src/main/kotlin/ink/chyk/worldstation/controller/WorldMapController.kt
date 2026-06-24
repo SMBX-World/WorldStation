@@ -54,7 +54,8 @@ class WorldMapController(
         @RequestParam(required = false) pageSize: Int = 20,
         @RequestParam(required = false) page: Int = 0,
         @RequestParam(required = false) version: String? = null,
-        @RequestParam(required = false) uploader: Int? = null
+        @RequestParam(required = false) uploader: Int? = null,
+        @RequestParam(required = false) sort: String? = null
     ): ApiResponseDTO<List<WorldMapDTO>> {
         // 处理游戏版本号
         val version = if (version != null) {
@@ -75,7 +76,8 @@ class WorldMapController(
             pageSize = pageSize,
             pageNumber = page,
             version = version,
-            uploader = uploader
+            uploader = uploader,
+            sort = sort
         )
         return ApiResponseDTO(data = worldMaps)
     }

@@ -50,7 +50,8 @@ class WorldMapRepository {
         pageSize: Int = 20,
         pageNumber: Int = 0,
         uploader: Int? = null,
-        version: GameVersion? = null
+        version: GameVersion? = null,
+        sort: String? = null
     ) = transaction {
         WorldMap.selectAll().apply {
             /*
@@ -80,7 +81,12 @@ class WorldMapRepository {
             if (pageNumber > 0) {
                 offset(pageNumber * pageSize.toLong())
             }
-            orderBy(WorldMap.id to SortOrder.DESC)
+            val sortOrder = if (sort == "title") {
+                WorldMap.title to SortOrder.ASC
+            } else {
+                WorldMap.id to SortOrder.DESC
+            }
+            orderBy(sortOrder)
         }.map {
             WorldMapDTO.fromEntity(it)
         }

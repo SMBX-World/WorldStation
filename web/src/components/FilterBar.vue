@@ -6,6 +6,14 @@ import {GAME_VERSION_INFO} from "../utils.js";
 import {useUserIdStore} from "../stores/userId.js";
 import {useRouterStore} from "../stores/router.js";
 
+// props
+defineProps({
+  isLoggedIn: {
+    type: Boolean,
+    default: false
+  }
+})
+
 // refs
 const folded = ref(false)
 const versions = ref([])  // available versions
@@ -14,6 +22,7 @@ const changed = ref(false) // whether the filter has changed and not applied yet
 const title = ref("")
 const version = ref("")
 const onlyUploader = ref(false)
+const sort = ref("")
 
 const userIdStore = useUserIdStore()
 const router = useRouterStore()
@@ -50,7 +59,7 @@ function initVersions() {
 
 function applyFilter() {
   changed.value = false
-  emit('applyFilter', title.value, version.value, onlyUploader.value ? userIdStore.userId : -1)
+  emit('applyFilter', title.value, version.value, onlyUploader.value ? userIdStore.userId : -1, sort.value)
 }
 
 function setChanged() {
@@ -62,15 +71,15 @@ function setChanged() {
 <template>
   <Semisolid color="white" class="filter-bar">
     <div class="flex-row gap">
-      <a class="flex-row gap-small" @click="router.push('/upload/worldmap')">
-        <img class="img16" src="/static/to-upload.png" alt="筛选"/>
+      <a v-if="isLoggedIn" class="flex-row gap-small" @click="router.push('/upload/worldmap')">
+        <img class="img16" src="/static/to-upload.png" alt="上传地图"/>
         <strong>上传地图</strong>
       </a>
-      <a class="flex-row gap-small" @click="router.push('/upload/image')">
-        <img class="img16" src="/static/to-picbed.png" alt="筛选"/>
+      <a v-if="isLoggedIn" class="flex-row gap-small" @click="router.push('/upload/image')">
+        <img class="img16" src="/static/to-picbed.png" alt="上传图片"/>
         <strong>上传图片</strong>
       </a>
-      <span>|</span>
+      <span v-if="isLoggedIn">|</span>
       <span class="flex-row gap-small">
         <img class="img16" src="/static/pipe.png" alt="筛选"/>
         <strong>筛选地图 ...</strong>
@@ -93,7 +102,14 @@ function setChanged() {
             <option v-for="v in versions" :key="v" :value="v">{{ GAME_VERSION_INFO[v].name }}</option>
           </select>
         </span>
-        <span>
+        <span class="flex-row gap-small">
+          <strong>排序</strong>
+          <select v-model="sort" @change="setChanged">
+            <option value="">默认排序</option>
+            <option value="title">按作品名称排序</option>
+          </select>
+        </span>
+        <span v-if="isLoggedIn">
           <input type="checkbox" v-model="onlyUploader" id="onlyUploader" @change="setChanged"/>
           <label for="onlyUploader">仅显示我上传的地图</label>
         </span>
