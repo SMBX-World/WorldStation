@@ -4,7 +4,6 @@
 
 import {onMounted, onUnmounted, ref, watch} from 'vue'
 import WorldMapItem from "./WorldMapItem.vue";
-import {useUrlStore} from "../stores/url.js";
 
 // 页面大小
 const PAGE_SIZE = 20
@@ -30,22 +29,12 @@ const filters = defineProps({
   }
 })
 
-// stores
-const urlStore = useUrlStore()
-
 // refs
 const worldMaps = ref([])
 const scrollComponent = ref(null)
-const needsLogin = ref(false)
 
 const getWorldMaps = async (page = 0, pageSize = PAGE_SIZE, filters = buildFilters()) => {
-  const result = await fetch(`/api/worldmaps?page=${page}&pageSize=${pageSize}${filters}`, {
-    redirect: "manual"
-  })
-  if (result.type.endsWith("redirect") || result.status === 302) {
-    needsLogin.value = true
-    return []
-  }
+  const result = await fetch(`/api/worldmaps?page=${page}&pageSize=${pageSize}${filters}`)
   if (!result.ok) {
     throw new Error(`获取世界地图失败: ${result.statusText}`)
   }
@@ -163,12 +152,7 @@ async function updateFilters(newTitle, oldTitle, newVersion, oldVersion, newUser
   <div ref="scrollComponent" class="worldmap-list">
     <WorldMapItem v-for="wm in worldMaps" :world-map="wm" :key="wm.id"/>
     <!-- 为了防止某些人的显示器超级无敌大 -->
-    <div v-if="needsLogin" class="load-more">
-      <span>
-        <a @click="urlStore.jumpToLogin()">登录</a>以查看更多地图
-      </span>
-    </div>
-    <div v-else class="load-more">
+    <div class="load-more">
       <span @click="loadMoreWorldMaps" v-if="!scrolledToEnd">
         加载更多地图
       </span>

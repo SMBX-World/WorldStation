@@ -1,6 +1,5 @@
 package ink.chyk.worldstation.configuration
 
-import ink.chyk.worldstation.util.PageRequestMatcher
 import org.springframework.context.annotation.*
 import org.springframework.http.HttpMethod
 import org.springframework.beans.factory.ObjectProvider
@@ -12,10 +11,6 @@ import org.springframework.security.config.annotation.web.invoke
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher
-import org.springframework.security.web.util.matcher.AndRequestMatcher
-import org.springframework.security.web.util.matcher.ParameterRequestMatcher
-import org.springframework.security.web.util.matcher.RegexRequestMatcher
-import org.springframework.security.web.util.matcher.RequestMatcher
 
 
 
@@ -56,10 +51,7 @@ class SecurityConfig {
                 authorize("/static-cc9fff6d.bundle", permitAll)
                 authorize("/static/**", permitAll)
                 authorize("/assets/**", permitAll)
-                authorize(AndRequestMatcher(
-                    PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.GET, "/api/worldmaps"),
-                    PageRequestMatcher(2)
-                ), permitAll)
+                authorize(PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.GET, "/api/worldmaps"), permitAll)
                 authorize(PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.GET, "/api/versions"), permitAll)
                 authorize("/api/motd", permitAll)
                 authorize("/login/**", permitAll)
