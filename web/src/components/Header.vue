@@ -7,12 +7,13 @@ import {getXsrfToken} from "../utils.js";
 const userIdStore = useUserIdStore()
 
 function logout() {
-  // 不等待响应，立即清理状态并刷新页面
+  // keepalive 确保页面跳转后请求不被中断
   fetch("/api/logout", {
     method: "POST",
     headers: {
       "X-XSRF-TOKEN": getXsrfToken(),
     },
+    keepalive: true,
     redirect: "manual",
   })
   userIdStore.clearUserId()
