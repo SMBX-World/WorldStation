@@ -31,7 +31,7 @@ function initVersions() {
 }
 
 function initMap() {
-  const id = new URL(window.location.host + router.route).searchParams.get("id")
+  const id = new URL(router.route, window.location.origin).searchParams.get("id")
   if (!id) {
     map.value = null
     loading.value = false
