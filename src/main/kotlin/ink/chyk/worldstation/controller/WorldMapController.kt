@@ -27,7 +27,7 @@ class WorldMapController(
         @AuthenticationPrincipal principal: OAuth2User
     ): ApiResponseDTO<Boolean> {
         // 比对上传者（管理员可编辑任意地图）
-        val currentUserId = principal.getAttribute<Int>("id")
+        val currentUserId = principal.getAttribute<Int>("id") ?: return ApiResponseDTO(code = 403, message = "您没有权限修改该地图信息")
         if (worldMapDTO.uploader != currentUserId && !isAdmin(currentUserId)) {
             return ApiResponseDTO(code = 403, message = "您没有权限修改该地图信息")
         }
@@ -92,7 +92,7 @@ class WorldMapController(
     ): ApiResponseDTO<Boolean> {
         val map = repository.getWorldMapById(id)
             ?: return ApiResponseDTO(code = 404, message = "请求的地图不存在")
-        val currentUserId = principal.getAttribute<Int>("id")
+        val currentUserId = principal.getAttribute<Int>("id") ?: return ApiResponseDTO(code = 403, message = "您没有权限删除该地图")
         // 检查地图是否属于当前用户或当前用户是管理员
         if (map.uploader != currentUserId && !isAdmin(currentUserId)) {
             return ApiResponseDTO(code = 403, message = "您没有权限删除该地图")
