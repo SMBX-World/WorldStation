@@ -15,11 +15,12 @@ class UserController(
     @GetMapping()
     fun user(@AuthenticationPrincipal principal: OAuth2User): UserDTO {
         val id = principal.attributes["id"] as Int
+        val username = principal.attributes["username"] as String
         return UserDTO(
             id = id,
-            username = principal.attributes["username"] as String,
-            nickname = principal.attributes["nickname"] as String,
-            avatar_url = principal.attributes["avatar_url"] as String,
+            username = username,
+            nickname = (principal.attributes["nickname"] as? String) ?: username,
+            avatar_url = principal.attributes["avatar_url"] as? String,
             isAdmin = id in adminConfig.ids
         )
     }
