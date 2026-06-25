@@ -48,7 +48,7 @@ class SecurityConfig {
                 authorize("/404", permitAll)
                 authorize("/index.html", permitAll)
                 authorize("/sw.js", permitAll)
-                authorize("/static-cc9fff6d.bundle", permitAll)
+                authorize("/static-*.bundle", permitAll)
                 authorize("/static/**", permitAll)
                 authorize("/assets/**", permitAll)
                 authorize(PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.GET, "/api/worldmaps"), permitAll)

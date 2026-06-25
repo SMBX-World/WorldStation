@@ -1,5 +1,5 @@
-const CACHE_NAME = 'smbx-world-static-cache-v1'
-const BUNDLE_URL = '/static-cc9fff6d.bundle'
+const CACHE_NAME = 'smbx-world-static-cache-v2'
+const BUNDLE_URL = '__BUNDLE_URL__'
 const MAGIC = 'sMbXwRlD'
 
 self.addEventListener('install', event => {
@@ -7,7 +7,13 @@ self.addEventListener('install', event => {
 })
 
 self.addEventListener('activate', event => {
-  event.waitUntil(self.clients.claim())
+  event.waitUntil(
+    caches.keys().then(keys => {
+      return Promise.all(
+        keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+      )
+    }).then(() => self.clients.claim())
+  )
 })
 
 self.addEventListener('fetch', event => {
@@ -53,7 +59,8 @@ self.addEventListener('fetch', event => {
     const blob = extract(bundle, pathname)
     const mime = guessMime(pathname)
     if (!blob) {
-      throw new Error("无法从资源包中提取文件")
+      // bundle 中找不到，回退到网络请求（新文件未打包的场景）
+      return fetch(event.request)
     }
 
     const resp = new Response(blob, {
