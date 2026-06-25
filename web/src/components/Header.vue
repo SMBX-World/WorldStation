@@ -1,11 +1,29 @@
 <script setup>
 
 import UserAvatar from "./UserAvatar.vue";
+import {useUserIdStore} from "../stores/userId.js";
+import {getXsrfToken} from "../utils.js";
+
+const userIdStore = useUserIdStore()
+
+async function logout() {
+  await fetch("/api/logout", {
+    method: "POST",
+    headers: {
+      "X-XSRF-TOKEN": getXsrfToken(),
+    },
+  })
+  userIdStore.clearUserId()
+  window.location.href = "/"
+}
 </script>
 
 <template>
   <div class="forum-logo-outer">
-    <span style="width: 52px"></span>
+    <span class="flex-row gap-small" v-if="userIdStore.isLoggedIn">
+      <a @click="logout" class="logout-link">登出</a>
+    </span>
+    <span v-else style="width: 52px"></span>
     <a href="https://station.smbx.world"><img src="/static/smbx-world.png" alt="SMBX World Logo" class="forum-logo" /></a>
     <UserAvatar />
   </div>
@@ -30,6 +48,11 @@ import UserAvatar from "./UserAvatar.vue";
 .forum-logo:hover {
   translate: -2px -2px;
   filter: drop-shadow(4px 4px 4px #000000aa);
+}
+
+.logout-link {
+  cursor: pointer;
+  font-size: 14px;
 }
 
 @media (max-width: 600px) {

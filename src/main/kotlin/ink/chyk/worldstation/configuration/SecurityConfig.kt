@@ -64,6 +64,13 @@ class SecurityConfig {
                     defaultSuccessUrl("/", true)
                 }
             }
+            logout {
+                logoutUrl = "/api/logout"
+                logoutSuccessUrl = "/"
+                invalidateHttpSession = true
+                clearAuthentication = true
+                deleteCookies("JSESSIONID", "XSRF-TOKEN")
+            }
         }
         return http.build()
     }
