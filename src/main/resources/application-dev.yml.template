@@ -19,7 +19,7 @@ spring:
             authorization-uri: https://smbx.world/oauth/authorize
             token-uri: https://smbx.world/oauth/token
             user-info-uri: https://smbx.world/api/user
-            user-name-attribute: nickname
+            user-name-attribute: username
 
 springdoc:
   api-docs:

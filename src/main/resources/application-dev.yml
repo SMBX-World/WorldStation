@@ -4,20 +4,20 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
   datasource:
-    url: jdbc:postgresql://host.home.chyk.ink:15432/station
-    username: station
-    password: station_password
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
   security:
     oauth2:
       client:
         registration:
           smbx-world:
-            client-id: "***REMOVED***"
-            client-secret: "***REMOVED***"
+            client-id: ${OAUTH2_CLIENT_ID}
+            client-secret: ${OAUTH2_CLIENT_SECRET}
             authorization-grant-type: authorization_code
             scope: "user.read"
-            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            redirect-uri: "https://station.smbx.world/login/oauth2/code/{registrationId}"
         provider:
           smbx-world:
             authorization-uri: https://smbx.world/oauth/authorize
@@ -29,23 +29,15 @@ springdoc:
   api-docs:
     enabled: true
   swagger-ui:
-    enabled: true
+    enabled: ${SWAGGER_UI_ENABLED}
     path: /docs
     csrf:
       enabled: true
       cookie-name: "XSRF-TOKEN"
 
-logging:
-  level:
-    org.springframework.security: DEBUG
-    org.springframework.web: DEBUG
-    org.springframework.boot.autoconfigure.security.servlet: DEBUG
-    org.springframework.boot.actuate.endpoint.web: DEBUG
-
-
 onedrive:
-  alist: https://assets2.station.chyk.ink
-  alist-token: alist-***REMOVED***
+  alist: ${ONEDRIVE_ALIST}
+  alist-token: ${ONEDRIVE_ALIST_TOKEN}
   worldmap-path: /station
   picbed-path: /picbed
 
