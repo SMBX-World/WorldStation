@@ -6,12 +6,14 @@ import {getXsrfToken} from "../utils.js";
 
 const userIdStore = useUserIdStore()
 
-async function logout() {
-  await fetch("/api/logout", {
+function logout() {
+  // 不等待响应，立即清理状态并刷新页面
+  fetch("/api/logout", {
     method: "POST",
     headers: {
       "X-XSRF-TOKEN": getXsrfToken(),
     },
+    redirect: "manual",
   })
   userIdStore.clearUserId()
   window.location.href = "/"
@@ -21,7 +23,10 @@ async function logout() {
 <template>
   <div class="forum-logo-outer">
     <span class="flex-row gap-small" v-if="userIdStore.isLoggedIn">
-      <a @click="logout" class="logout-link">登出</a>
+      <a @click="logout" class="logout-link">
+        <img src="/static/door.png" alt="登出" class="logout-icon no-drag"/>
+        <span>登出</span>
+      </a>
     </span>
     <span v-else style="width: 52px"></span>
     <a href="https://station.smbx.world"><img src="/static/smbx-world.png" alt="SMBX World Logo" class="forum-logo" /></a>
@@ -53,6 +58,22 @@ async function logout() {
 .logout-link {
   cursor: pointer;
   font-size: 14px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+}
+
+.logout-icon {
+  width: 16px;
+  height: 32px;
+}
+
+@media (prefers-color-scheme: light) {
+  .logout-link {
+    color: #fff;
+    text-shadow: 1px 1px 1px #000, -1px -1px 1px #000, 1px -1px 1px #000, -1px 1px 1px #000;
+  }
 }
 
 @media (max-width: 600px) {

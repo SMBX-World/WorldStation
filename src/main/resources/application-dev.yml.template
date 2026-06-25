@@ -1,3 +1,6 @@
+server:
+  forward-headers-strategy: native
+
 spring:
   datasource:
     url: ${SPRING_DATASOURCE_URL}
