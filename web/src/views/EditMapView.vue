@@ -46,9 +46,9 @@ function initMap() {
       .then(j => {
         if (j.code === 0) {
           map.value = j.data
-          title.value = map.value.title
-          version.value = map.value.gameVersion
-          author.value = map.value.author
+          title.value = map.value.title || ""
+          version.value = map.value.gameVersion || ""
+          author.value = map.value.author || ""
           console.log("Loaded map info:", map.value)
         } else {
           map.value = null
@@ -63,7 +63,11 @@ function initMap() {
 }
 
 const isValid = computed(() => {
-  return title.value.trim() !== "" && version.value !== "" && author.value.trim() !== ""
+  return (title.value || "").trim() !== "" && version.value !== "" && (author.value || "").trim() !== ""
+})
+
+const isOwnMap = computed(() => {
+  return map.value?.uploader === userIdStore.userId
 })
 
 onMounted(() => {
@@ -137,10 +141,18 @@ function deleteMap() {
 <template>
   <div class="edit-map-view" v-if="!loading && map !== null && (map.uploader === userIdStore.userId || userIdStore.isAdmin)">
     <Semisolid color="blue">
-      <strong class="flex-row gap-small center"><img src="/static/qblock.gif" alt="edit icon"
-                                                     class="img16"/>编辑地图信息</strong>
-      <p>这里可以编辑你上传的地图的信息。</p>
-      <p>如果需要更换地图文件，请删除当前地图并重新上传。</p>
+      <template v-if="isOwnMap">
+        <strong class="flex-row gap-small center"><img src="/static/qblock.gif" alt="edit icon"
+                                                       class="img16"/>编辑地图信息</strong>
+        <p>这里可以编辑你上传的地图的信息。</p>
+        <p>如果需要更换地图文件，请删除当前地图并重新上传。</p>
+      </template>
+      <template v-else>
+        <strong class="flex-row gap-small center"><img src="/static/qblock.gif" alt="edit icon"
+                                                       class="img16"/>管理员编辑</strong>
+        <p>你正在以管理员身份编辑 <strong>{{ map.title }}</strong>（上传者 ID: {{ map.uploader }}）的信息。</p>
+        <p>如需更换地图文件，请删除当前地图并联系上传者重新上传。</p>
+      </template>
     </Semisolid>
     <Semisolid color="white">
       <div class="upload-worldmap-details">

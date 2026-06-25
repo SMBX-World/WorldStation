@@ -6,7 +6,7 @@ import UserAvatar from "./UserAvatar.vue";
 <template>
   <div class="forum-logo-outer">
     <span style="width: 52px"></span>
-    <a href="https://smbx.world"><img src="/static/smbx-world.png" alt="SMBX World Logo" class="forum-logo" /></a>
+    <a href="https://station.smbx.world"><img src="/static/smbx-world.png" alt="SMBX World Logo" class="forum-logo" /></a>
     <UserAvatar />
   </div>
 </template>
