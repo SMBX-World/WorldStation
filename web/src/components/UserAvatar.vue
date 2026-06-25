@@ -18,7 +18,7 @@ onMounted(() => {
         avatarUrl.value = data.avatar_url || "/static/unknown.png"
         nickname.value = data.nickname || "点击登录"
         userIdStore.setUserId(data.id)
-        userIdStore.setAdmin(data.isAdmin || false)
+        userIdStore.setAdmin(data.admin || false)
       })
     } else {
       // 如果是游客，这个 api 会返回 302
