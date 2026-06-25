@@ -40,7 +40,7 @@ onMounted(() => {
       <span class="ellipsis">游戏版本: {{ver.name}}</span>
     </div>
     <a class="flex-right-row"
-       v-if="userIdStore.userId === worldMap.uploader && showDown"
+       v-if="(userIdStore.userId === worldMap.uploader || userIdStore.isAdmin) && showDown"
        @click="router.push('/edit?id=' + worldMap.id)"
     >
       <img

@@ -135,7 +135,7 @@ function deleteMap() {
 </script>
 
 <template>
-  <div class="edit-map-view" v-if="!loading && map !== null && map.uploader === userIdStore.userId">
+  <div class="edit-map-view" v-if="!loading && map !== null && (map.uploader === userIdStore.userId || userIdStore.isAdmin)">
     <Semisolid color="blue">
       <strong class="flex-row gap-small center"><img src="/static/qblock.gif" alt="edit icon"
                                                      class="img16"/>编辑地图信息</strong>

@@ -35,6 +35,8 @@ server:
     max-swallow-size: -1
 
 worldstation:
+  admin:
+    ids: [1, 3, 6]
   upload:
     temp-dir: ./upload-tmp
     chunk-size: 8388608

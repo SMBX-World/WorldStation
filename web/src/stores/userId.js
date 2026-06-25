@@ -3,6 +3,7 @@ import {defineStore} from "pinia";
 export const useUserIdStore = defineStore('user_id', {
   state: () => ({
     userId: -1,  // unset
+    isAdmin: false,
   }),
   getters: {
     getUserId: (state) => {
@@ -16,8 +17,12 @@ export const useUserIdStore = defineStore('user_id', {
     setUserId(userId) {
       this.userId = userId
     },
+    setAdmin(isAdmin) {
+      this.isAdmin = isAdmin
+    },
     clearUserId() {
       this.userId = -1
+      this.isAdmin = false
     },
   },
 })

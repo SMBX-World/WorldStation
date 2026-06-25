@@ -1,5 +1,6 @@
 package ink.chyk.worldstation.controller
 
+import ink.chyk.worldstation.configuration.AdminConfig
 import ink.chyk.worldstation.dto.*
 import ink.chyk.worldstation.enum.GameVersion
 import ink.chyk.worldstation.repository.WorldMapRepository
@@ -12,7 +13,8 @@ import org.springframework.web.bind.annotation.*
 @RequestMapping("/api/worldmaps")
 class WorldMapController(
     private val repository: WorldMapRepository,
-    private val onedrive: OneDriveService
+    private val onedrive: OneDriveService,
+    private val adminConfig: AdminConfig
 ) {
     @PostMapping
     fun newWorldMap(@RequestBody worldMapDTO: WorldMapDTO): ApiResponseDTO<WorldMapDTO> {
@@ -24,8 +26,9 @@ class WorldMapController(
         @RequestBody worldMapDTO: WorldMapDTO,
         @AuthenticationPrincipal principal: OAuth2User
     ): ApiResponseDTO<Boolean> {
-        // 比对上传者
-        if (worldMapDTO.uploader != principal.getAttribute<Int>("id")) {
+        // 比对上传者（管理员可编辑任意地图）
+        val currentUserId = principal.getAttribute<Int>("id")
+        if (worldMapDTO.uploader != currentUserId && !isAdmin(currentUserId)) {
             return ApiResponseDTO(code = 403, message = "您没有权限修改该地图信息")
         }
 
@@ -87,20 +90,22 @@ class WorldMapController(
         @PathVariable id: Int,
         @AuthenticationPrincipal principal: OAuth2User
     ): ApiResponseDTO<Boolean> {
-        val worldMapUploader = repository.getWorldMapById(id)?.uploader
+        val map = repository.getWorldMapById(id)
             ?: return ApiResponseDTO(code = 404, message = "请求的地图不存在")
-        // 检查地图是否属于当前用户
-        if (worldMapUploader != principal.getAttribute<Int>("id")) {
+        val currentUserId = principal.getAttribute<Int>("id")
+        // 检查地图是否属于当前用户或当前用户是管理员
+        if (map.uploader != currentUserId && !isAdmin(currentUserId)) {
             return ApiResponseDTO(code = 403, message = "您没有权限删除该地图")
         }
-        val url = repository.getWorldMapById(id)?.downloadUrl
-            ?: return ApiResponseDTO(code = 404, message = "请求的地图不存在")
         val successOrNot = repository.deleteWorldMapById(id)
-        val deleteOrNot = onedrive.tryRemoveByUrl(url)
+        val deleteOrNot = onedrive.tryRemoveByUrl(map.downloadUrl)
         return if (successOrNot && deleteOrNot) {
             ApiResponseDTO(message = "删除成功", data = true)
         } else {
             ApiResponseDTO(code = 500, message = "删除失败", data = false)
         }
     }
+
+    /** 判断用户是否为管理员 */
+    private fun isAdmin(userId: Int): Boolean = userId in adminConfig.ids
 }

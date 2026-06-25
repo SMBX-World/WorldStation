@@ -5,4 +5,5 @@ data class UserDTO(
     val username: String,
     val nickname: String,
     val avatar_url: String? = null,
+    val isAdmin: Boolean = false,
 )
