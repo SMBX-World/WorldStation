@@ -44,7 +44,8 @@ WorldStation/
 │   │   ├── SecurityConfig.kt         # 安全配置（CSRF、OAuth2 登录、授权规则）
 │   │   ├── ApplicationConfig.kt      # RestTemplate Bean（30 分钟超时）
 │   │   ├── AsyncConfig.kt            # 异步请求超时 2 小时
-│   │   └── OneDriveConfig.kt         # AList 连接配置（@ConfigurationProperties）
+│   │   ├── OneDriveConfig.kt         # AList 连接配置（@ConfigurationProperties）
+│   │   └── AdminConfig.kt            # 管理员用户 ID 列表配置
 │   ├── controller/
 │   │   ├── WorldMapController.kt     # 地图 CRUD API
 │   │   ├── OneDriveController.kt     # 流式文件上传 API
@@ -55,7 +56,7 @@ WorldStation/
 │   ├── dto/
 │   │   ├── ApiResponseDTO.kt         # 统一响应格式 {code, message, data}
 │   │   ├── WorldMapDTO.kt            # 地图 DTO（含 fromEntity 映射）
-│   │   ├── UserDTO.kt                # 用户 DTO
+│   │   ├── UserDTO.kt                # 用户 DTO（含 isAdmin 字段）
 │   │   └── MotdDTO.kt                # 每日消息 DTO
 │   ├── entity/
 │   │   ├── WorldMap.kt               # maps 表定义（Exposed Table）
@@ -70,8 +71,7 @@ WorldStation/
 │   ├── service/
 │   │   └── OneDriveService.kt        # AList 文件上传/删除核心逻辑
 │   └── util/
-│       ├── ContentTypeUtils.kt       # 文件类型检测与 MIME 映射
-│       └── PageRequestMatcher.kt     # 自定义安全匹配器（游客允许前 N 页）
+│       └── ContentTypeUtils.kt       # 文件类型检测与 MIME 映射
 │
 └── web/                              # 前端项目
     ├── package.json                  # Vue 3 + Vite + Pinia + @vueuse/core + marked
@@ -96,21 +96,20 @@ WorldStation/
         │   ├── RouterView.vue        # 动态路由出口
         │   └── NotFoundView.vue      # 404 页面
         └── components/
-            ├── Header.vue            # 顶部导航（Logo + 用户头像）
+            ├── Header.vue            # 顶部导航（Logo + 用户头像 + 登出按钮）
             ├── Footer.vue            # 页脚
             ├── ScrollingBackground.vue # 滚动背景（自适应暗色/亮色）
             ├── Spring.vue            # 回到顶部按钮（Spring Boot 双关梗）
             ├── Semisolid.vue         # SMBX 风格卡片容器（白/蓝配色）
             ├── WorldMapList.vue      # 无限滚动地图列表 + 客户端缓存
             ├── WorldMapItem.vue      # 单个地图条目
-            ├── FilterBar.vue         # 地图筛选栏（标题/版本/上传者）
+            ├── FilterBar.vue         # 地图筛选栏（标题/版本/排序/上传者，登录态感知）
             ├── UploadBox.vue         # 拖拽上传组件
             ├── ProgressBar.vue       # SMBX 风格进度条（马力欧行走动画）
             ├── InputBox.vue          # 带下划线样式的输入框
             ├── CopyUrl.vue           # 复制链接按钮（useClipboard）
             ├── UserAvatar.vue        # 用户头像（自动获取 /api/user）
-            ├── Motd.vue              # 每日消息（Markdown 渲染）
-            └── NotLoggedInWarning.vue # 未登录提示
+            └── Motd.vue              # 每日消息（Markdown 渲染）
 ```
 
 ## 后端架构要点
@@ -119,13 +118,14 @@ WorldStation/
 
 | 方法 | 路径 | 说明 | 认证 |
 |------|------|------|------|
-| GET | `/api/worldmaps` | 搜索地图（分页、筛选） | 前 2 页公开 |
+| GET | `/api/worldmaps` | 搜索地图（分页、筛选、排序） | 公开 |
 | GET | `/api/worldmaps/worldmap/{id}` | 获取单个地图 | 需要登录 |
 | POST | `/api/worldmaps` | 新增地图记录 | 需要登录 |
-| PUT | `/api/worldmaps` | 更新地图信息 | 需要登录（仅上传者） |
-| DELETE | `/api/worldmaps/worldmap/{id}` | 删除地图 | 需要登录（仅上传者） |
+| PUT | `/api/worldmaps` | 更新地图信息 | 需要登录（上传者或管理员） |
+| DELETE | `/api/worldmaps/worldmap/{id}` | 删除地图 | 需要登录（上传者或管理员） |
 | PUT | `/api/onedrive/upload` | 流式上传文件 | 需要登录 |
 | GET | `/api/user` | 获取当前用户信息 | 302 重定向到登录 |
+| POST | `/api/logout` | 登出（清除 session 和 cookies） | 需要登录 |
 | GET | `/api/motd` | 获取启用的每日消息 | 公开 |
 | GET | `/api/versions` | 获取游戏版本列表 | 公开 |
 | `/{path}` | SPA 路由回退 | 前端路由 | 公开 |
@@ -133,9 +133,11 @@ WorldStation/
 ### 安全模型
 
 - **CSRF**: 启用 CookieCsrfTokenRepository（`XSRF-TOKEN` cookie），前端读取后通过 `X-XSRF-TOKEN` 头发送
-- **OAuth2 认证**: smbx.world 作为 OAuth2 Provider，授权码模式，scope 为 `user.read`
-- **授权**: 地图增删改操作校验 `principal.id == worldMap.uploader`，不是上传者返回 403
-- **游客限制**: `PageRequestMatcher` 允许游客不登录查看前 2 页地图，超出则触发 OAuth2 登录
+- **OAuth2 认证**: smbx.world 作为 OAuth2 Provider，授权码模式，scope 为 `user.read`，`user-name-attribute` 为 `username`
+- **授权**: 地图增删改操作校验 `principal.id == worldMap.uploader || isAdmin`，非上传者且非管理员返回 403
+- **管理员**: 通过 `worldstation.admin.ids` 配置管理员用户 ID 列表，管理员可编辑/删除任意地图
+- **登出**: `POST /api/logout` 清除 session、authentication 和 cookies，前端通过 `fetch` + `keepalive` 调用
+- **Forward Headers**: `server.forward-headers-strategy: native`，适配反向代理场景
 
 ### 文件上传流程
 
@@ -163,13 +165,8 @@ WorldStation/
 - **maps 表**: id, title, title_lower, author, uploader, game_version (enum), download_provider (enum), download_url
   - `title_lower` 列建有 `pg_trgm` GIN 索引，支持模糊搜索
   - 搜索时将用户输入的空格替换为 `%` 进行 LIKE 匹配
+  - 排序支持：默认按 id 降序（最新优先），`sort=title` 时按标题升序
 - **motd 表**: id, content, enabled
-
-### 日志级别
-
-开发环境（`application-dev.yml.template`）中安全相关日志设为 DEBUG 级别：
-- `org.springframework.security: DEBUG`
-- `org.springframework.web: DEBUG`
 
 ## 前端架构要点
 
@@ -186,7 +183,9 @@ WorldStation/
 用 Python 脚本 `static-bundle.py` 将所有静态资源打包成单个 `.bundle` 文件：
 - 文件头魔数：`sMbXwRlD`
 - 结构：Magic(8) + IndexLength(4) + Index(JSON) + TotalLength(4) + Data
-- Service Worker 拦截 `/static/*` 请求，从 bundle 中提取对应文件并缓存
+- 文件名含内容 MD5 哈希（如 `static-a1b2c3d4.bundle`），打包后自动更新 `sw.js` 中的占位符 URL 并清理旧 bundle
+- Service Worker 拦截 `/static/*` 请求，从 bundle 中提取对应文件并缓存；bundle 中找不到的文件回退到网络请求
+- Service Worker 激活时自动清理旧版缓存
 - 首次访问只需下载一个 bundle 文件，后续访问完全离线可用
 
 ### 无限滚动与客户端缓存
@@ -198,8 +197,8 @@ WorldStation/
 
 ### 地图列表页公开访问控制
 
-- 未登录用户可查看前 2 页地图（约 40 条），超出后 API 返回 302 重定向到登录
-- `WorldMapList.vue` 检测到重定向响应后显示"登录以查看更多"链接
+- 地图列表 API（`GET /api/worldmaps`）完全公开，不再限制游客只能查看前 N 页
+- 筛选栏（FilterBar）对所有用户可见，但上传按钮、排序选项中的"仅显示我上传的地图"仅在登录后显示
 
 ## 部署
 
