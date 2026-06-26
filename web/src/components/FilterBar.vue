@@ -84,8 +84,8 @@ function setChanged() {
         <img class="img16" src="/static/pipe.png" alt="筛选"/>
         <strong>筛选地图 ...</strong>
       </span>
-      <span class="flex-right" v-if="folded" @click="unfold">展开 ⏷</span>
-      <span class="flex-right" v-else @click="fold">收起 ⏶</span>
+      <span class="flex-right" v-if="folded" @click="unfold">展开 ▼</span>
+      <span class="flex-right" v-else @click="fold">收起 ▲</span>
     </div>
     <div v-if="!folded">
       <hr/>
