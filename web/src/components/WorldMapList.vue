@@ -146,6 +146,7 @@ async function updateFilters() {
   worldMaps.value = []
   scrolledToEnd = false
   requestPending = false
+  currentPage = 0
   window.scrollTo({
     top: 0,
     behavior: 'smooth'
