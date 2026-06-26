@@ -33,6 +33,12 @@ const filters = defineProps({
   }
 })
 
+const emit = defineEmits(['edit'])
+
+function onEdit(mapId) {
+  emit('edit', mapId)
+}
+
 // refs
 const worldMaps = ref([])
 const scrollComponent = ref(null)
@@ -163,11 +169,23 @@ async function updateFilters() {
   }
 }
 
+defineExpose({
+  refreshMapItem(updatedMap) {
+    const index = worldMaps.value.findIndex(m => m.id === updatedMap.id)
+    if (index !== -1) {
+      worldMaps.value[index] = updatedMap
+    }
+  },
+  removeMapItem(mapId) {
+    worldMaps.value = worldMaps.value.filter(m => m.id !== mapId)
+  }
+})
+
 </script>
 
 <template>
   <div ref="scrollComponent" class="worldmap-list">
-    <WorldMapItem v-for="wm in worldMaps" :world-map="wm" :key="wm.id"/>
+    <WorldMapItem v-for="wm in worldMaps" :world-map="wm" :key="wm.id" @edit="onEdit"/>
     <!-- 为了防止某些人的显示器超级无敌大 -->
     <div class="load-more">
       <span @click="loadMoreWorldMaps" v-if="!scrolledToEnd">

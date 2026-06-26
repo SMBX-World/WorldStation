@@ -2,7 +2,6 @@
 import {GAME_VERSION_INFO, DOWNLOAD_PROVIDER_INFO} from "../utils.js"
 import {onMounted, ref} from "vue";
 import {useUserIdStore} from "../stores/userId.js";
-import {useRouterStore} from "../stores/router.js";
 
 const {worldMap} = defineProps({
   worldMap: {
@@ -11,7 +10,8 @@ const {worldMap} = defineProps({
   }
 });
 
-const router = useRouterStore();
+const emit = defineEmits(['edit'])
+
 const userIdStore = useUserIdStore();
 
 const ver = ref(GAME_VERSION_INFO[worldMap.gameVersion])
@@ -41,7 +41,7 @@ onMounted(() => {
     </div>
     <a class="flex-right-row"
        v-if="(userIdStore.userId === worldMap.uploader || userIdStore.isAdmin) && showDown"
-       @click="router.push('/edit?id=' + worldMap.id)"
+       @click="emit('edit', worldMap.id)"
     >
       <img
           src="/static/qblock.gif"
