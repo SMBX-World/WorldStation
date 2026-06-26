@@ -32,7 +32,7 @@ services:
     restart: unless-stopped
 
   app:
-    image: ghcr.io/smbx-world/worldstation:latest
+    build: .
     depends_on:
       - db
       - alist
