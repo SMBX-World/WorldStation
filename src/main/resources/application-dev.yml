@@ -28,6 +28,18 @@ spring:
             user-info-uri: https://smbx.world/api/user
             user-name-attribute: username
 
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 3000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 2
+          max-wait: 1000ms
+
 springdoc:
   api-docs:
     enabled: true
