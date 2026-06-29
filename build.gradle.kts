@@ -38,10 +38,6 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
 
-    // Spring Session + Redis (外部化会话，支持容器重启后自动恢复登录状态)
-    implementation("org.springframework.boot:spring-boot-starter-data-redis")
-    implementation("org.springframework.session:spring-session-data-redis")
-
     // Exposed
     implementation("org.jetbrains.exposed:exposed-core:1.0.0-beta-2")
     implementation("org.jetbrains.exposed:exposed-jdbc:1.0.0-beta-2")

@@ -64,10 +64,6 @@ class SecurityConfig {
                     defaultSuccessUrl("/", true)
                 }
             }
-            sessionManagement {
-                // 总是创建会话（即使未认证也创建，确保 CSRF 令牌可用）
-                sessionCreationPolicy = org.springframework.security.config.http.SessionCreationPolicy.IF_REQUIRED
-            }
             logout {
                 logoutUrl = "/api/logout"
                 logoutSuccessUrl = "/"

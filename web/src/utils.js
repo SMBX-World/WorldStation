@@ -260,22 +260,5 @@ export {
   getXsrfToken,
   GAME_VERSION_INFO,
   DOWNLOAD_PROVIDER_INFO,
-  requestJson,
-  uploadFile,
-  checkSession
-}
-
-/**
- * 验证当前用户会话是否仍然有效。
- * 用于 API 请求返回 401/403 后的会话恢复检测。
- *
- * @returns {Promise<boolean>} true 表示会话有效，false 表示需要重新登录
- */
-async function checkSession() {
-  try {
-    const res = await fetch("/api/user", {redirect: "manual"})
-    return res.ok
-  } catch {
-    return false
-  }
+  uploadFile
 }
