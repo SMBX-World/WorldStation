@@ -1,7 +1,11 @@
 package ink.chyk.worldstation.configuration
 
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.jsontype.LaissezFaireSubTypeValidator
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer
+import org.springframework.data.redis.serializer.RedisSerializer
 import org.springframework.session.FlushMode
 import org.springframework.session.SaveMode
 import org.springframework.session.data.redis.config.annotation.web.http.EnableRedisHttpSession
@@ -20,7 +24,6 @@ import org.springframework.session.web.http.DefaultCookieSerializer
  * - FlushMode.IMMEDIATE：每次请求后立即将会话变更持久化到 Redis，确保即使进程意外终止也不丢失
  * - SaveMode.ON_SET_ATTRIBUTE：仅在属性实际变更时才保存，减少 Redis 写入压力
  * - Cookie 序列化器：统一域名、路径、sameSite 策略
- * - 序列化器使用 Spring Boot 默认的 GenericJackson2JsonRedisSerializer，已支持 OAuth2 principal
  */
 @Configuration
 @EnableRedisHttpSession(
@@ -45,5 +48,20 @@ class SessionConfig {
         serializer.setSameSite("Lax")
         // 不设置 domain，由浏览器自动使用当前域名
         return serializer
+    }
+
+    /**
+     * 使用 Jackson JSON 序列化会话属性，确保复杂的 OAuth2 principal 对象能被正确序列化。
+     * 创建独立的 ObjectMapper 实例，避免影响 Spring Boot 默认的序列化行为。
+     */
+    @Bean
+    fun springSessionDefaultRedisSerializer(): RedisSerializer<Any> {
+        val mapper = ObjectMapper().apply {
+            activateDefaultTyping(
+                polymorphicTypeValidator,
+                ObjectMapper.DefaultTyping.NON_FINAL
+            )
+        }
+        return GenericJackson2JsonRedisSerializer(mapper)
     }
 }
