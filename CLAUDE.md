@@ -15,7 +15,6 @@
 | JDK | Java 21 |
 | 构建工具 | Gradle (Kotlin DSL) |
 | 数据库 | PostgreSQL 15 |
-| 缓存/会话 | Redis 7（Spring Session 外部化会话存储） |
 | ORM | Exposed 1.0.0-beta-2（JetBrains 官方 Kotlin ORM） |
 | 认证 | Spring Security + OAuth2 Client（授权码模式） |
 | 文件存储 | AList v3.45.0（通过 REST API 流式转发） |
@@ -46,8 +45,7 @@ WorldStation/
 │   │   ├── ApplicationConfig.kt      # RestTemplate Bean（30 分钟超时）
 │   │   ├── AsyncConfig.kt            # 异步请求超时 2 小时
 │   │   ├── OneDriveConfig.kt         # AList 连接配置（@ConfigurationProperties）
-│   │   ├── AdminConfig.kt            # 管理员用户 ID 列表配置
-│   │   └── SessionConfig.kt          # Redis 会话配置（Spring Session + Cookie 序列化）
+│   │   └── AdminConfig.kt            # 管理员用户 ID 列表配置
 │   ├── controller/
 │   │   ├── WorldMapController.kt     # 地图 CRUD API
 │   │   ├── OneDriveController.kt     # 流式文件上传 API
@@ -84,7 +82,7 @@ WorldStation/
     └── src/
         ├── main.js                   # Vue 应用入口
         ├── App.vue                   # 根组件（背景+头部+路由+页脚+Spring）
-        ├── utils.js                  # 工具函数（版本/下载信息映射、上传函数、会话检查）
+        ├── utils.js                  # 工具函数（版本/下载信息映射、上传函数）
         ├── css/style.css             # 全局样式（暗色模式、响应式、工具类）
         ├── stores/
         │   ├── router.js             # 自研 SPA 路由（Pinia + history.pushState）
@@ -110,7 +108,7 @@ WorldStation/
             ├── ProgressBar.vue       # SMBX 风格进度条（马力欧行走动画）
             ├── InputBox.vue          # 带下划线样式的输入框
             ├── CopyUrl.vue           # 复制链接按钮（useClipboard）
-            ├── UserAvatar.vue        # 用户头像（自动获取 /api/user，支持页面可见性变化时会话恢复检查）
+            ├── UserAvatar.vue        # 用户头像（自动获取 /api/user）
             └── Motd.vue              # 每日消息（Markdown 渲染）
 ```
 
@@ -136,12 +134,6 @@ WorldStation/
 
 - **CSRF**: 启用 CookieCsrfTokenRepository（`XSRF-TOKEN` cookie），前端读取后通过 `X-XSRF-TOKEN` 头发送
 - **OAuth2 认证**: smbx.world 作为 OAuth2 Provider，授权码模式，scope 为 `user.read`，`user-name-attribute` 为 `username`
-- **会话管理**: Spring Session + Redis 外部化会话存储
-  - 会话持久化到 Redis，支持容器重启后自动恢复登录状态
-  - `FlushMode.IMMEDIATE`：每次请求后立即将会话变更持久化到 Redis
-  - `SaveMode.ON_SET_ATTRIBUTE`：仅在属性实际变更时才保存，减少 Redis 写入压力
-  - 会话过期时间：7 天无活动后自动过期
-  - Cookie 序列化器：统一域名、路径、sameSite 策略（`JSESSIONID`，HttpOnly，Lax）
 - **授权**: 地图增删改操作校验 `principal.id == worldMap.uploader || isAdmin`，非上传者且非管理员返回 403
 - **管理员**: 通过 `worldstation.admin.ids` 配置管理员用户 ID 列表，管理员可编辑/删除任意地图
 - **登出**: `POST /api/logout` 清除 session、authentication 和 cookies，前端通过 `fetch` + `keepalive` 调用
@@ -176,14 +168,6 @@ WorldStation/
   - 排序支持：默认按 id 降序（最新优先），`sort=title` 时按标题升序
 - **motd 表**: id, content, enabled
 
-### 会话存储
-
-- **Redis**: 用于 Spring Session 外部化会话存储
-  - 命名空间前缀：`worldstation:session`
-  - 序列化方式：Jackson JSON（支持复杂 OAuth2 principal 对象）
-  - 内存限制：256mb，LRU 淘汰策略
-  - 持久化：启用 AOF（appendonly yes），确保数据安全
-
 ## 前端架构要点
 
 ### 自研 SPA 路由
@@ -216,12 +200,6 @@ WorldStation/
 - 地图列表 API（`GET /api/worldmaps`）完全公开，不再限制游客只能查看前 N 页
 - 筛选栏（FilterBar）对所有用户可见，但上传按钮、排序选项中的"仅显示我上传的地图"仅在登录后显示
 
-### 会话恢复检查
-
-- **UserAvatar 组件**：监听 `visibilitychange` 事件，用户切换回标签页时自动验证会话是否仍然有效
-- **checkSession 工具函数**：API 请求返回 401/403 后可用于会话恢复检测
-- **设计目标**：配合 Redis 会话持久化，确保容器重启后用户无需重新登录
-
 ## 部署
 
 ### Docker Compose（推荐）
@@ -230,10 +208,9 @@ WorldStation/
 docker compose up -d
 ```
 
-启动四个服务：
+启动三个服务：
 - **db**: PostgreSQL 15，端口 15432
 - **alist**: AList v3.45.0，端口 5244
-- **redis**: Redis 7（Alpine），端口 16379，256mb 内存限制
 - **app**: Spring Boot，端口 8080
 
 ### 环境变量
@@ -248,15 +225,13 @@ docker compose up -d
 | `OAUTH2_CLIENT_ID` | OAuth2 客户端 ID |
 | `OAUTH2_CLIENT_SECRET` | OAuth2 客户端密钥 |
 | `SWAGGER_UI_ENABLED` | 是否启用 Swagger UI（`/docs`） |
-| `REDIS_HOST` | Redis 服务主机（默认 `redis`） |
-| `REDIS_PORT` | Redis 服务端口（默认 `6379`） |
 | `ONEDRIVE_ALIST` | AList 服务 URL |
 | `ONEDRIVE_ALIST_TOKEN` | AList API Token |
 
 ### 本地开发
 
 ```bash
-# 后端（需要先启动 PostgreSQL、AList 和 Redis）
+# 后端（需要先启动 PostgreSQL、AList）
 ./gradlew bootRun
 
 # 前端（开发服务器，自动代理 API 到 localhost:8080）
