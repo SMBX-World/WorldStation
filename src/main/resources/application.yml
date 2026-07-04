@@ -42,6 +42,6 @@ worldstation:
     chunk-size: 8388608
     stream-start-window-chunks: 4
     chunk-wait-timeout-seconds: 60
-    session-ttl-hours: 24
+    session-ttl-hours: 2
     max-active-sessions-per-user: 2
     keep-chunks-until-completed: true

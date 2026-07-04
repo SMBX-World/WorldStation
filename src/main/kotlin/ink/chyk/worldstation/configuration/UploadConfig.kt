@@ -10,7 +10,7 @@ class UploadConfig {
     var chunkSize: Int = 8 * 1024 * 1024
     var streamStartWindowChunks: Int = 4
     var chunkWaitTimeoutSeconds: Long = 60
-    var sessionTtlHours: Long = 6
+    var sessionTtlHours: Long = 2
     var maxActiveSessionsPerUser: Int = 2
     var keepChunksUntilCompleted: Boolean = true
 }
