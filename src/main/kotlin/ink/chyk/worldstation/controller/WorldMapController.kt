@@ -4,7 +4,8 @@ import ink.chyk.worldstation.configuration.AdminConfig
 import ink.chyk.worldstation.dto.*
 import ink.chyk.worldstation.enum.GameVersion
 import ink.chyk.worldstation.repository.WorldMapRepository
-import ink.chyk.worldstation.service.OneDriveService
+import ink.chyk.worldstation.service.StorageDeleteResult
+import ink.chyk.worldstation.service.StorageService
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.oauth2.core.user.OAuth2User
 import org.springframework.web.bind.annotation.*
@@ -13,7 +14,7 @@ import org.springframework.web.bind.annotation.*
 @RequestMapping("/api/worldmaps")
 class WorldMapController(
     private val repository: WorldMapRepository,
-    private val onedrive: OneDriveService,
+    private val storageService: StorageService,
     private val adminConfig: AdminConfig
 ) {
     @PostMapping
@@ -97,9 +98,12 @@ class WorldMapController(
         if (map.uploader != currentUserId && !isAdmin(currentUserId)) {
             return ApiResponseDTO(code = 403, message = "您没有权限删除该地图")
         }
+        val storageDeleteResult = storageService.deleteByUrl(map.downloadUrl)
+        if (storageDeleteResult == StorageDeleteResult.FAILED) {
+            return ApiResponseDTO(code = 500, message = "删除存储文件失败", data = false)
+        }
         val successOrNot = repository.deleteWorldMapById(id)
-        val deleteOrNot = onedrive.tryRemoveByUrl(map.downloadUrl)
-        return if (successOrNot && deleteOrNot) {
+        return if (successOrNot) {
             ApiResponseDTO(message = "删除成功", data = true)
         } else {
             ApiResponseDTO(code = 500, message = "删除失败", data = false)

@@ -13,6 +13,7 @@ import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.security.oauth2.core.user.OAuth2User
 import org.springframework.stereotype.Service
 import java.io.InputStream
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
@@ -33,7 +34,7 @@ class ChunkWaitTimeoutException(message: String) : RuntimeException(message)
 class ChunkedUploadService(
     private val config: UploadConfig,
     private val repository: ChunkedUploadRepository,
-    private val oneDriveService: OneDriveService,
+    private val storageService: StorageService,
     @Qualifier("storageUploadExecutor") private val storageUploadExecutor: Executor,
 ) {
     companion object {
@@ -67,7 +68,7 @@ class ChunkedUploadService(
             throw ChunkedUploadException("同时上传的文件过多，请稍后再试")
         }
 
-        val prepared = oneDriveService.prepareUpload(
+        val prepared = storageService.prepareUpload(
             request.uploadKind,
             fileName,
             principal,
@@ -90,7 +91,7 @@ class ChunkedUploadService(
             totalSize = request.totalSize,
             chunkSize = config.chunkSize,
             totalChunks = totalChunks,
-            targetPath = prepared.uploadPath,
+            targetPath = prepared.objectKey,
             tempDir = tempDir.toString(),
             status = ChunkedUploadStatus.CREATED,
             savedChunkCount = 0,
@@ -207,26 +208,15 @@ class ChunkedUploadService(
 
     private fun processUpload(uploadId: UUID) {
         val session = repository.getSession(uploadId) ?: return
-        val prepared = PreparedOneDriveUpload(
-            uploadPath = session.targetPath,
-            parentPath = session.targetPath.substringBeforeLast("/"),
+        val prepared = PreparedStorageUpload(
+            objectKey = session.targetPath.trim('/'),
             contentType = session.contentType,
             contentLength = session.totalSize,
-            finalUrl = oneDriveService.finalUrlForPath(session.targetPath),
+            finalUrl = storageService.finalUrlForKey(session.targetPath),
         )
 
-        val result = oneDriveService.uploadPreparedStream(prepared) { outputStream ->
-            for (index in 0 until session.totalChunks) {
-                waitForVerifiedChunk(session.id, index)
-                val partPath = chunkPath(session, index)
-                Files.newInputStream(partPath).use { input ->
-                    input.transferTo(outputStream)
-                }
-                repository.markChunkSaved(session.id, index, index + 1, System.currentTimeMillis())
-                if (!config.keepChunksUntilCompleted) {
-                    partPath.deleteIfExists()
-                }
-            }
+        val result = ChunkSequenceInputStream(session).use { inputStream ->
+            storageService.uploadPreparedFileStream(prepared, inputStream)
         }
 
         if (result.isSuccess) {
@@ -259,6 +249,67 @@ class ChunkedUploadService(
             Thread.sleep(500)
         }
         throw ChunkWaitTimeoutException("等待分块超时")
+    }
+
+    /**
+     * 将已经校验的临时分块暴露为一条连续输入流，让 S3 PutObject 保持真正的流式上传。
+     * 读取到分块边界时同步更新服务端处理进度。
+     */
+    private inner class ChunkSequenceInputStream(
+        private val session: UploadSessionRecord,
+    ) : InputStream() {
+        private var chunkIndex = 0
+        private var current: InputStream? = null
+        private var currentRemaining = 0L
+        private var closed = false
+
+        override fun read(): Int {
+            val singleByte = ByteArray(1)
+            val read = read(singleByte, 0, 1)
+            return if (read < 0) -1 else singleByte[0].toInt() and 0xff
+        }
+
+        override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+            if (closed) throw IOException("Stream is closed")
+            if (length == 0) return 0
+            if (chunkIndex >= session.totalChunks) return -1
+            openCurrentChunk()
+
+            val allowed = min(length.toLong(), currentRemaining).toInt()
+            val read = current!!.read(buffer, offset, allowed)
+            if (read < 0) throw IOException("分块 $chunkIndex 的实际大小小于校验记录")
+            currentRemaining -= read
+            if (currentRemaining == 0L) finishCurrentChunk()
+            return read
+        }
+
+        private fun openCurrentChunk() {
+            if (current != null) return
+            waitForVerifiedChunk(session.id, chunkIndex)
+            val chunk = repository.getChunk(session.id, chunkIndex)
+                ?: throw IOException("分块 $chunkIndex 不存在")
+            currentRemaining = chunk.size.toLong()
+            current = Files.newInputStream(chunkPath(session, chunkIndex))
+        }
+
+        private fun finishCurrentChunk() {
+            current?.close()
+            current = null
+            val completedIndex = chunkIndex
+            chunkIndex++
+            repository.markChunkSaved(session.id, completedIndex, chunkIndex, System.currentTimeMillis())
+            if (!config.keepChunksUntilCompleted) {
+                chunkPath(session, completedIndex).deleteIfExists()
+            }
+        }
+
+        override fun close() {
+            if (!closed) {
+                closed = true
+                current?.close()
+                current = null
+            }
+        }
     }
 
     private fun getOwnedSession(uploadId: UUID, principal: OAuth2User): UploadSessionRecord {

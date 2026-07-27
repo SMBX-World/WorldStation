@@ -38,13 +38,19 @@ springdoc:
       enabled: true
       cookie-name: "XSRF-TOKEN"
 
-onedrive:
-  alist: ${ONEDRIVE_ALIST}
-  alist-token: ${ONEDRIVE_ALIST_TOKEN}
-  worldmap-path: /station
-  picbed-path: /picbed
-
 worldstation:
+  storage:
+    s3:
+      endpoint: ${S3_ENDPOINT}
+      region: ${S3_REGION}
+      bucket: ${S3_BUCKET}
+      public-base-url: ${S3_PUBLIC_BASE_URL}
+      path-style-access: ${S3_PATH_STYLE_ACCESS:false}
+      access-key: ${S3_ACCESS_KEY:}
+      secret-key: ${S3_SECRET_KEY:}
+      session-token: ${S3_SESSION_TOKEN:}
+      worldmap-prefix: ${S3_WORLDMAP_PREFIX:station}
+      picbed-prefix: ${S3_PICBED_PREFIX:picbed}
   admin:
     ids: [1, 3, 6]
   upload:

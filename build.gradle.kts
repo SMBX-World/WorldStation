@@ -27,6 +27,8 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
+    testImplementation(platform("org.testcontainers:testcontainers-bom:1.21.4"))
+    testImplementation("org.testcontainers:junit-jupiter")
     implementation("org.springframework.boot:spring-boot-starter-web")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
@@ -37,6 +39,10 @@ dependencies {
     ext["spring-security.version"] = "6.5.0"
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
+
+    // S3-compatible 对象存储
+    implementation(platform("software.amazon.awssdk:bom:2.49.3"))
+    implementation("software.amazon.awssdk:s3")
 
     // Exposed
     implementation("org.jetbrains.exposed:exposed-core:1.0.0-beta-2")

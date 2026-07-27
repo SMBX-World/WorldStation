@@ -10,23 +10,10 @@ services:
       - db_data:/var/lib/postgresql/data
     restart: unless-stopped
 
-  alist:
-    image: xhofe/alist:v3.45.0
-    ports:
-      - "5244:5244"
-    volumes:
-      - alist_data:/opt/alist/data
-    environment:
-      - PUID=0
-      - PGID=0
-      - UMASK=022
-    restart: unless-stopped
-
   app:
     image: ghcr.io/smbx-world/worldstation:latest
     depends_on:
       - db
-      - alist
     ports:
       - "8080:8080"
     environment:
@@ -36,11 +23,17 @@ services:
       OAUTH2_CLIENT_ID: "***REMOVED***"
       OAUTH2_CLIENT_SECRET: "***REMOVED***"
       SWAGGER_UI_ENABLED: "true"
-      ONEDRIVE_ALIST: "http://alist:5244"
-      ONEDRIVE_ALIST_TOKEN: "alist-***REMOVED***"
+      S3_ENDPOINT: "https://s3.example.com"
+      S3_REGION: "auto"
+      S3_BUCKET: "worldstation"
+      S3_PUBLIC_BASE_URL: "https://assets.example.com"
+      S3_PATH_STYLE_ACCESS: "false"
+      S3_ACCESS_KEY: "***REMOVED***"
+      S3_SECRET_KEY: "***REMOVED***"
+      S3_SESSION_TOKEN: ""
+      S3_WORLDMAP_PREFIX: "station"
+      S3_PICBED_PREFIX: "picbed"
     restart: unless-stopped
 
 volumes:
   db_data:
-  alist_data:
-

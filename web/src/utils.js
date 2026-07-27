@@ -106,7 +106,7 @@ async function uploadChunk(uploadId, chunkIndex, chunk, file, chunkSize, checksu
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
 
-    xhr.open('PUT', `/api/onedrive/uploads/${uploadId}/chunks/${chunkIndex}`, true)
+    xhr.open('PUT', `/api/storage/uploads/${uploadId}/chunks/${chunkIndex}`, true)
 
     const xsrfToken = getXsrfToken()
     const start = chunkIndex * chunkSize
@@ -170,7 +170,7 @@ async function uploadChunkWithRetry(uploadId, chunkIndex, chunk, file, chunkSize
 
 async function waitUploadCompleted(uploadId, onProgress) {
   while (true) {
-    const status = await requestJson(`/api/onedrive/uploads/${uploadId}`)
+    const status = await requestJson(`/api/storage/uploads/${uploadId}`)
     if (status.status === 'COMPLETED') {
       if (onProgress) onProgress(100)
       return status.finalUrl
@@ -192,7 +192,7 @@ async function uploadFile(file, fileName, uploadKind, onProgress) {
   try {
     if (onProgress) onProgress(0)
 
-    const session = await requestJson('/api/onedrive/uploads', {
+    const session = await requestJson('/api/storage/uploads', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -235,7 +235,7 @@ async function uploadFile(file, fileName, uploadKind, onProgress) {
       if (onProgress) onProgress(Math.min(99, Math.round((confirmedBytes / file.size) * 99)))
     }
 
-    const completed = await requestJson(`/api/onedrive/uploads/${session.uploadId}/complete`, {
+    const completed = await requestJson(`/api/storage/uploads/${session.uploadId}/complete`, {
       method: 'POST'
     })
 

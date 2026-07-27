@@ -17,7 +17,7 @@
 | 数据库 | PostgreSQL 15 |
 | ORM | Exposed 1.0.0-beta-2（JetBrains 官方 Kotlin ORM） |
 | 认证 | Spring Security + OAuth2 Client（授权码模式） |
-| 文件存储 | AList v3.45.0（通过 REST API 流式转发） |
+| 文件存储 | S3-compatible（AWS SDK v2 服务端流式上传） |
 | 前端 | Vue 3.5 + Vite 6 + Pinia |
 | 容器化 | Docker 多阶段构建 + docker-compose |
 
@@ -27,14 +27,13 @@
 WorldStation/
 ├── build.gradle.kts              # Gradle 构建配置（依赖、插件）
 ├── settings.gradle.kts           # Gradle 设置（项目名）
-├── docker-compose.yml            # 编排 PostgreSQL + AList + App
+├── docker-compose.yml            # 编排 PostgreSQL + App（连接外部 S3）
 ├── Dockerfile                    # 多阶段构建（Node → Gradle → JDK）
 ├── sql/                          # 数据库 DDL 脚本
 │   ├── worldmap.sql              # maps 表建表语句
 │   └── title_index.sql           # pg_trgm 模糊搜索索引
 ├── scripts/
-│   ├── docker-entrypoint.sh      # 容器入口（envsubst 渲染配置 → 启动 jar）
-│   └── import_maps.js            # 地图数据导入脚本
+│   └── docker-entrypoint.sh      # 容器入口（envsubst 渲染配置 → 启动 jar）
 ├── development_docs/
 │   └── oauth2_principal_format.json  # OAuth2 用户信息响应格式参考
 │
@@ -42,13 +41,12 @@ WorldStation/
 │   ├── WorldStationApplication.kt    # Spring Boot 入口
 │   ├── configuration/
 │   │   ├── SecurityConfig.kt         # 安全配置（CSRF、OAuth2 登录、授权规则）
-│   │   ├── ApplicationConfig.kt      # RestTemplate Bean（30 分钟超时）
 │   │   ├── AsyncConfig.kt            # 异步请求超时 2 小时
-│   │   ├── OneDriveConfig.kt         # AList 连接配置（@ConfigurationProperties）
+│   │   ├── S3StorageConfig.kt        # S3 客户端和连接配置
 │   │   └── AdminConfig.kt            # 管理员用户 ID 列表配置
 │   ├── controller/
 │   │   ├── WorldMapController.kt     # 地图 CRUD API
-│   │   ├── OneDriveController.kt     # 流式文件上传 API
+│   │   ├── StorageController.kt      # 普通及分块文件上传 API
 │   │   ├── UserController.kt         # 当前用户信息 API
 │   │   ├── MotdController.kt         # 每日消息 API
 │   │   ├── VersionsController.kt     # 游戏版本枚举 API
@@ -69,7 +67,9 @@ WorldStation/
 │   │   ├── WorldMapRepository.kt     # 地图数据库操作（Exposed transaction）
 │   │   └── MotdRepository.kt         # 每日消息查询
 │   ├── service/
-│   │   └── OneDriveService.kt        # AList 文件上传/删除核心逻辑
+│   │   ├── StorageService.kt         # 通用存储接口
+│   │   ├── S3StorageService.kt       # S3 上传/删除核心逻辑
+│   │   └── ChunkedUploadService.kt   # 分块续传和临时文件管理
 │   └── util/
 │       └── ContentTypeUtils.kt       # 文件类型检测与 MIME 映射
 │
@@ -123,7 +123,10 @@ WorldStation/
 | POST | `/api/worldmaps` | 新增地图记录 | 需要登录 |
 | PUT | `/api/worldmaps` | 更新地图信息 | 需要登录（上传者或管理员） |
 | DELETE | `/api/worldmaps/worldmap/{id}` | 删除地图 | 需要登录（上传者或管理员） |
-| PUT | `/api/onedrive/upload` | 流式上传文件 | 需要登录 |
+| PUT | `/api/storage/upload` | 流式上传文件 | 需要登录 |
+| POST | `/api/storage/uploads` | 创建分块上传会话 | 需要登录 |
+| PUT | `/api/storage/uploads/{id}/chunks/{index}` | 上传并校验分块 | 需要登录 |
+| GET/POST/DELETE | `/api/storage/uploads/{id}` | 查询、完成或取消分块上传 | 需要登录 |
 | GET | `/api/user` | 获取当前用户信息 | 302 重定向到登录 |
 | POST | `/api/logout` | 登出（清除 session 和 cookies） | 需要登录 |
 | GET | `/api/motd` | 获取启用的每日消息 | 公开 |
@@ -141,15 +144,15 @@ WorldStation/
 
 ### 文件上传流程
 
-1. 前端通过 XMLHttpRequest 流式上传（带进度回调）
-2. `OneDriveController` 接收流并转发到 AList 的 `/api/fs/put` 端点
-3. `OneDriveService` 处理：
+1. 前端创建上传会话，并通过 XMLHttpRequest 分块上传（带进度及 SHA-256 校验）
+2. `StorageController` 将分块保存到服务器临时目录
+3. `ChunkedUploadService` 按序读取已校验分块，`S3StorageService` 通过 `PutObject` 流式写入 S3：
    - 根据 `UploadFileKind` 确定存储路径
    - 世界地图按标题首字母分类（A-Z / 0-9 / Others）
    - 图床按用户 ID 分类（`picbed_{userId}`）
    - 自动检测 MIME 类型，浏览器报告 `application/octet-stream` 时根据扩展名纠正
-   - 上传后刷新 AList 文件系统缓存
-4. 返回 AList 直链 URL 给前端
+   - 对象键不带前导 `/`，公开链接使用 `public-base-url` 拼接并逐段编码
+4. 返回固定公开基址下的永久直链给前端
 5. 前端再 POST 地图元信息到 `/api/worldmaps`
 
 ### 上传限制
@@ -208,10 +211,9 @@ WorldStation/
 docker compose up -d
 ```
 
-启动三个服务：
+启动两个服务：
 - **db**: PostgreSQL 15，端口 15432
-- **alist**: AList v3.45.0，端口 5244
-- **app**: Spring Boot，端口 8080
+- **app**: Spring Boot，端口 8080；对象存储使用外部 S3-compatible 服务
 
 ### 环境变量
 
@@ -225,13 +227,19 @@ docker compose up -d
 | `OAUTH2_CLIENT_ID` | OAuth2 客户端 ID |
 | `OAUTH2_CLIENT_SECRET` | OAuth2 客户端密钥 |
 | `SWAGGER_UI_ENABLED` | 是否启用 Swagger UI（`/docs`） |
-| `ONEDRIVE_ALIST` | AList 服务 URL |
-| `ONEDRIVE_ALIST_TOKEN` | AList API Token |
+| `S3_ENDPOINT` | S3 API endpoint |
+| `S3_REGION` | S3 签名 region |
+| `S3_BUCKET` | 存储桶名称 |
+| `S3_PUBLIC_BASE_URL` | 文件公开访问基址/CDN 域名 |
+| `S3_PATH_STYLE_ACCESS` | 是否强制 path-style 访问 |
+| `S3_ACCESS_KEY` / `S3_SECRET_KEY` | 静态访问凭据；同时留空时使用默认凭据链 |
+| `S3_SESSION_TOKEN` | 可选临时凭据 token |
+| `S3_WORLDMAP_PREFIX` / `S3_PICBED_PREFIX` | 地图和图床对象键前缀 |
 
 ### 本地开发
 
 ```bash
-# 后端（需要先启动 PostgreSQL、AList）
+# 后端（需要先启动 PostgreSQL 并配置外部 S3-compatible 服务）
 ./gradlew bootRun
 
 # 前端（开发服务器，自动代理 API 到 localhost:8080）
