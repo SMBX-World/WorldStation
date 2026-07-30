@@ -119,7 +119,7 @@ async function uploadChunk(uploadId, chunkIndex, chunk, file, chunkSize, checksu
 
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) {
-        const percentComplete = Math.min(99, Math.round(((confirmedBytes + event.loaded) / file.size) * 99));
+        const percentComplete = Math.min(80, Math.round(((confirmedBytes + event.loaded) / file.size) * 80));
         if (onProgress) {
           onProgress(percentComplete);
         }
@@ -168,29 +168,45 @@ async function uploadChunkWithRetry(uploadId, chunkIndex, chunk, file, chunkSize
   throw lastError
 }
 
+function reportProcessingProgress(status, onProgress) {
+  const savedChunkCount = Math.min(status.savedChunkCount || 0, status.totalChunks || 0)
+  const progress = status.status === 'COMPLETED'
+    ? 100
+    : status.totalChunks > 0
+      ? Math.min(99, Math.round(80 + (savedChunkCount / status.totalChunks) * 20))
+      : 80
+
+  onProgress(progress, {
+    savedChunkCount,
+    totalChunks: status.totalChunks || 0
+  })
+}
+
 async function waitUploadCompleted(uploadId, onProgress) {
   while (true) {
     const status = await requestJson(`/api/storage/uploads/${uploadId}`)
     if (status.status === 'COMPLETED') {
-      if (onProgress) onProgress(100)
+      reportProcessingProgress(status, onProgress)
       return status.finalUrl
     }
     if (status.status === 'FAILED' || status.status === 'ABORTED' || status.status === 'EXPIRED') {
       throw new Error(status.error || '服务器处理文件失败')
     }
-    if (onProgress) {
-      const processingProgress = status.totalChunks > 0
-        ? Math.min(99, Math.round(99 + (status.savedChunkCount / status.totalChunks)))
-        : 99
-      onProgress(processingProgress)
-    }
+    reportProcessingProgress(status, onProgress)
     await sleep(2000)
   }
 }
 
 async function uploadFile(file, fileName, uploadKind, onProgress) {
+  let lastProgress = 0
+  const reportProgress = (progress, details) => {
+    const nextProgress = Math.max(lastProgress, Math.min(100, Math.round(progress)))
+    lastProgress = nextProgress
+    if (onProgress) onProgress(nextProgress, details)
+  }
+
   try {
-    if (onProgress) onProgress(0)
+    reportProgress(0)
 
     const session = await requestJson('/api/storage/uploads', {
       method: 'POST',
@@ -217,7 +233,7 @@ async function uploadFile(file, fileName, uploadKind, onProgress) {
       const start = index * session.chunkSize
       const end = Math.min(start + session.chunkSize, file.size)
       if (receivedChunks.has(index)) {
-        if (onProgress) onProgress(Math.min(99, Math.round((confirmedBytes / file.size) * 99)))
+        reportProgress(Math.min(80, Math.round((confirmedBytes / file.size) * 80)))
         continue
       }
 
@@ -229,23 +245,28 @@ async function uploadFile(file, fileName, uploadKind, onProgress) {
         file,
         session.chunkSize,
         confirmedBytes,
-        onProgress
+        reportProgress
       )
       confirmedBytes += chunk.size
-      if (onProgress) onProgress(Math.min(99, Math.round((confirmedBytes / file.size) * 99)))
+      reportProgress(Math.min(80, Math.round((confirmedBytes / file.size) * 80)))
     }
+
+    reportProgress(80, {
+      savedChunkCount: 0,
+      totalChunks: session.totalChunks
+    })
 
     const completed = await requestJson(`/api/storage/uploads/${session.uploadId}/complete`, {
       method: 'POST'
     })
 
     if (completed.status === 'COMPLETED') {
-      if (onProgress) onProgress(100)
+      reportProcessingProgress(completed, reportProgress)
       return apiResponse({code: 0, message: '文件上传成功', data: completed.finalUrl})
     }
 
-    if (onProgress) onProgress(99)
-    const finalUrl = await waitUploadCompleted(session.uploadId, onProgress)
+    reportProcessingProgress(completed, reportProgress)
+    const finalUrl = await waitUploadCompleted(session.uploadId, reportProgress)
     return apiResponse({code: 0, message: '文件上传成功', data: finalUrl})
   } catch (error) {
     return apiResponse({

@@ -20,6 +20,8 @@ const url = ref("") // upload URL
 
 const state = ref("idle") // idle, uploading, completed, error
 const percent = ref(0)
+const processedChunks = ref(0)
+const totalChunks = ref(0)
 const versions = ref([])  // available versions
 
 // stores
@@ -68,8 +70,16 @@ function startUpload() {
   const filename = '[' + GAME_VERSION_INFO[version.value].short + '] ' +  title.value.trim() + (ext ? ('.' + ext) : '')
   state.value = "uploading"
   percent.value = 0
+  processedChunks.value = 0
+  totalChunks.value = 0
 
-  uploadFile(file.value, filename, "WORLDMAP", p => percent.value = p)
+  uploadFile(file.value, filename, "WORLDMAP", (p, progress) => {
+    percent.value = p
+    if (progress) {
+      processedChunks.value = Math.max(processedChunks.value, progress.savedChunkCount)
+      totalChunks.value = progress.totalChunks
+    }
+  })
       .then(response => response.json())
       .then(data => {
         if (data.code === 0) {
@@ -156,8 +166,8 @@ function startUpload() {
       <div v-else-if="state === 'uploading'">
         <ProgressBar :percent="percent" />
         <br>
-        <strong v-if="percent < 99">上传中，请耐心等待，不要离开或刷新此页面。</strong>
-        <strong v-else>上传完成，服务器正在处理文件，请耐心等待。</strong>
+        <strong v-if="percent < 80">上传中，请耐心等待，不要离开或刷新此页面。</strong>
+        <strong v-else>上传完成，服务器正在处理文件（{{ processedChunks }}/{{ totalChunks }} 个分块），请耐心等待。</strong>
       </div>
 
       <div v-else-if="state === 'completed'">
