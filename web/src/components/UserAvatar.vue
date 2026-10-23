@@ -1,51 +1,42 @@
 <script setup>
-import {ref, onMounted} from "vue"
-import {useUrlStore} from "../stores/url.js";
+import {computed, ref, watch} from "vue"
 import {useUserIdStore} from "../stores/userId.js";
 
-const avatarUrl = ref("/static/unknown.png")
-const nickname = ref("点击登录")
-const urlStore = useUrlStore()
 const userIdStore = useUserIdStore()
-const loading = ref(true)
-const clickToLogin = ref(false)
+const avatarFailed = ref(false)
 
-onMounted(() => {
-  fetch("/api/user", {redirect: "manual"}).then(res => {
-    loading.value = false
-    if (res.ok) {
-      res.json().then(data =>{
-        avatarUrl.value = data.avatar_url || "/static/unknown.png"
-        nickname.value = data.nickname || "点击登录"
-        userIdStore.setUserId(data.id)
-        userIdStore.setAdmin(data.admin || false)
-      })
-    } else {
-      // 如果是游客，这个 api 会返回 302
-      const url = res.url || res.headers.get("Location")
-      if (url !== null) urlStore.setLoginUrl(url)
-      nickname.value = "点击登录"
-      clickToLogin.value = true
-      userIdStore.clearUserId()
-    }
-  })
+const avatarUrl = computed(() => {
+  return (avatarFailed.value || !userIdStore.avatarUrl)
+    ? "/static/unknown.png"
+    : userIdStore.avatarUrl
 })
 
-const login = () => {
-  if (clickToLogin.value) {
-    urlStore.jumpToLogin()
+const nickname = computed(() => {
+  if (userIdStore.nickname) return userIdStore.nickname
+  if (userIdStore.isLoggedIn) return userIdStore.username
+  return userIdStore.loaded ? "点击登录" : "加载中..."
+})
+
+const clickToLogin = computed(() => !userIdStore.isLoggedIn)
+
+watch(() => userIdStore.avatarUrl, () => {
+  avatarFailed.value = false
+})
+
+function onClick() {
+  if (!userIdStore.isLoggedIn) {
+    userIdStore.openLogin()
   }
 }
 </script>
 
 <template>
-  <div class="user-avatar" :class="{'click-to-login': clickToLogin}" @click="login">
+  <div class="user-avatar" :class="{'click-to-login': clickToLogin}" @click="onClick">
     <img
         class="avatar no-drag"
         :src="avatarUrl"
         alt="头像"
-        :class="{'loading': loading}"
-        @error="avatarUrl = '/static/unknown.png'"
+        @error="avatarFailed = true"
         v-tooltip.left="nickname"
     />
   </div>
@@ -68,20 +59,6 @@ const login = () => {
   .avatar, .user-avatar {
     width: 40px;
     height: 40px;
-  }
-}
-.loading {
-  animation: loading 2s infinite;
-}
-@keyframes loading {
-  0% {
-    filter: blur(4px);
-  }
-  50% {
-    filter: blur(2px);
-  }
-  100% {
-    filter: blur(4px);
   }
 }
 .click-to-login {

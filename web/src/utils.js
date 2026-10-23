@@ -1,8 +1,21 @@
 const getXsrfToken = () => {
-  const token = document.cookie
-    .split('; ')
-    .find(row => row.startsWith('XSRF-TOKEN='));
-  return token ? token.split('=')[1] : null;
+  const match = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]+)/)
+  return match ? decodeURIComponent(match[1]) : null
+}
+
+async function ensureXsrfToken() {
+  const existing = getXsrfToken()
+  if (existing) return existing
+  try {
+    const response = await fetch('/api/auth/csrf', { credentials: 'same-origin' })
+    if (response.ok) {
+      const json = await response.json().catch(() => null)
+      if (json?.data) return json.data
+    }
+  } catch (_) {
+    // 忽略，继续尝试读取 cookie
+  }
+  return getXsrfToken()
 }
 
 const GAME_VERSION_INFO = {
@@ -72,9 +85,11 @@ function apiResponse(data, status = 200, statusText = "OK") {
 }
 
 async function requestJson(url, options = {}) {
-  const headers = {
-    ...(options.headers || {}),
-    'X-XSRF-TOKEN': getXsrfToken()
+  const method = (options.method || 'GET').toUpperCase()
+  const headers = { ...(options.headers || {}) }
+  if (method !== 'GET' && method !== 'HEAD') {
+    const xsrfToken = await ensureXsrfToken()
+    if (xsrfToken) headers['X-XSRF-TOKEN'] = xsrfToken
   }
   const response = await fetch(url, {
     ...options,
@@ -198,6 +213,7 @@ async function waitUploadCompleted(uploadId, onProgress) {
 }
 
 async function uploadFile(file, fileName, uploadKind, onProgress) {
+  await ensureXsrfToken()
   let lastProgress = 0
   const reportProgress = (progress, details) => {
     const nextProgress = Math.max(lastProgress, Math.min(100, Math.round(progress)))
@@ -279,6 +295,8 @@ async function uploadFile(file, fileName, uploadKind, onProgress) {
 
 export {
   getXsrfToken,
+  ensureXsrfToken,
+  requestJson,
   GAME_VERSION_INFO,
   DOWNLOAD_PROVIDER_INFO,
   uploadFile

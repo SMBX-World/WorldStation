@@ -1,5 +1,6 @@
 package ink.chyk.worldstation.service
 
+import ink.chyk.worldstation.auth.FlarumPrincipal
 import ink.chyk.worldstation.configuration.S3StorageProperties
 import ink.chyk.worldstation.enum.UploadFileKind
 import org.junit.jupiter.api.Assertions.assertArrayEquals
@@ -12,8 +13,6 @@ import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
-import org.springframework.security.core.authority.SimpleGrantedAuthority
-import org.springframework.security.oauth2.core.user.DefaultOAuth2User
 import software.amazon.awssdk.core.sync.RequestBody
 import software.amazon.awssdk.services.s3.S3Client
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest
@@ -33,11 +32,7 @@ class S3StorageServiceTests {
     }
     private val s3 = mock(S3Client::class.java)
     private val service = S3StorageService(properties, s3)
-    private val principal = DefaultOAuth2User(
-        listOf(SimpleGrantedAuthority("ROLE_USER")),
-        mapOf("id" to 42, "username" to "tester"),
-        "username",
-    )
+    private val principal = FlarumPrincipal(42, "tester", "tester")
 
     @Test
     fun `prepare upload builds categorized and encoded worldmap URL`() {

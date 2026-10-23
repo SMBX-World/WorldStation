@@ -26,6 +26,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation("org.springframework.security:spring-security-test")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
     testImplementation(platform("org.testcontainers:testcontainers-bom:1.21.4"))
     testImplementation("org.testcontainers:junit-jupiter")
@@ -35,10 +36,10 @@ dependencies {
     // 调试工具
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.8")
 
-    // Spring Boot 验证方案
+    // Spring Security + JWT（仅使用 JOSE/JWT 能力，不再使用 OAuth2 登录）
     ext["spring-security.version"] = "6.5.0"
     implementation("org.springframework.boot:spring-boot-starter-security")
-    implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
+    implementation("org.springframework.security:spring-security-oauth2-jose")
 
     // S3-compatible 对象存储
     implementation(platform("software.amazon.awssdk:bom:2.49.3"))

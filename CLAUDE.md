@@ -2,7 +2,7 @@
 
 ## 项目概述
 
-[SMBX World Station](https://station.smbx.world) 是 [SMBX World 中文社区](https://smbx.world) 的附属地图仓库 & 图床网站。用户可通过 OAuth2 登录后上传 SMBX 游戏地图文件或图片，获取直链用于社区帖子。
+[SMBX World Station](https://station.smbx.world) 是 [SMBX World 中文社区](https://smbx.world) 的附属地图仓库 & 图床网站。用户可通过 SMBX World 论坛账号登录后上传 SMBX 游戏地图文件或图片，获取直链用于社区帖子。
 
 - **基础包名**: `ink.chyk.worldstation`
 - **许可证**: MIT
@@ -16,7 +16,7 @@
 | 构建工具 | Gradle (Kotlin DSL) |
 | 数据库 | PostgreSQL 15 |
 | ORM | Exposed 1.0.0-beta-2（JetBrains 官方 Kotlin ORM） |
-| 认证 | Spring Security + OAuth2 Client（授权码模式） |
+| 认证 | Spring Security + Flarum 用户名/密码登录（HttpOnly JWT Cookie） |
 | 文件存储 | S3-compatible（AWS SDK v2 服务端流式上传） |
 | 前端 | Vue 3.5 + Vite 6 + Pinia |
 | 容器化 | Docker 多阶段构建 + docker-compose |
@@ -35,18 +35,31 @@ WorldStation/
 ├── scripts/
 │   └── docker-entrypoint.sh      # 容器入口（envsubst 渲染配置 → 启动 jar）
 ├── development_docs/
-│   └── oauth2_principal_format.json  # OAuth2 用户信息响应格式参考
+│   └── oauth2_principal_format.json  # 用户信息响应格式参考（历史）
 │
 ├── src/main/kotlin/ink/chyk/worldstation/
 │   ├── WorldStationApplication.kt    # Spring Boot 入口
 │   ├── configuration/
-│   │   ├── SecurityConfig.kt         # 安全配置（CSRF、OAuth2 登录、授权规则）
+│   │   ├── SecurityConfig.kt         # 安全配置（CSRF、JWT Cookie、授权规则）
+│   │   ├── FlarumProperties.kt       # Flarum API 地址与超时配置
+│   │   ├── AuthProperties.kt         # JWT 密钥、Cookie 与限流配置
+│   │   ├── FlarumClientConfig.kt     # Flarum RestClient Bean
 │   │   ├── AsyncConfig.kt            # 异步请求超时 2 小时
 │   │   ├── S3StorageConfig.kt        # S3 客户端和连接配置
 │   │   └── AdminConfig.kt            # 管理员用户 ID 列表配置
+│   ├── auth/
+│   │   ├── FlarumPrincipal.kt        # 当前登录用户（Flarum uid）
+│   │   ├── FlarumClient.kt           # Flarum /api/token 与 /api/users 客户端
+│   │   ├── FlarumAuthService.kt      # 登录编排与限流
+│   │   ├── JwtService.kt             # JWT 签发/校验
+│   │   ├── JwtAuthenticationFilter.kt # Cookie → SecurityContext
+│   │   ├── AuthCookieService.kt      # 登录 Cookie 读写
+│   │   ├── LoginRateLimiter.kt       # 进程内登录失败限流
+│   │   └── JsonSecurityHandlers.kt   # 401/403 JSON 响应
 │   ├── controller/
 │   │   ├── WorldMapController.kt     # 地图 CRUD API
 │   │   ├── StorageController.kt      # 普通及分块文件上传 API
+│   │   ├── AuthController.kt         # 登录 / CSRF API
 │   │   ├── UserController.kt         # 当前用户信息 API
 │   │   ├── MotdController.kt         # 每日消息 API
 │   │   ├── VersionsController.kt     # 游戏版本枚举 API
@@ -86,8 +99,7 @@ WorldStation/
         ├── css/style.css             # 全局样式（暗色模式、响应式、工具类）
         ├── stores/
         │   ├── router.js             # 自研 SPA 路由（Pinia + history.pushState）
-        │   ├── userId.js             # 用户登录状态
-        │   └── url.js                # OAuth2 登录 URL
+        │   └── userId.js             # 用户登录状态与登录弹框开关
         ├── views/
         │   ├── MapListView.vue       # 首页：地图列表 + 筛选
         │   ├── UploadMapView.vue     # 上传地图页面
@@ -96,6 +108,7 @@ WorldStation/
         │   ├── RouterView.vue        # 动态路由出口
         │   └── NotFoundView.vue      # 404 页面
         └── components/
+            ├── LoginModal.vue        # 用户名/密码登录弹框
             ├── Header.vue            # 顶部导航（Logo + 用户头像 + 登出按钮）
             ├── Footer.vue            # 页脚
             ├── ScrollingBackground.vue # 滚动背景（自适应暗色/亮色）
@@ -127,19 +140,22 @@ WorldStation/
 | POST | `/api/storage/uploads` | 创建分块上传会话 | 需要登录 |
 | PUT | `/api/storage/uploads/{id}/chunks/{index}` | 上传并校验分块 | 需要登录 |
 | GET/POST/DELETE | `/api/storage/uploads/{id}` | 查询、完成或取消分块上传 | 需要登录 |
-| GET | `/api/user` | 获取当前用户信息 | 302 重定向到登录 |
-| POST | `/api/logout` | 登出（清除 session 和 cookies） | 需要登录 |
+| POST | `/api/auth/login` | Flarum 用户名/邮箱 + 密码登录 | 公开（需 CSRF） |
+| GET | `/api/auth/csrf` | 获取 CSRF token 并写入 Cookie | 公开 |
+| GET | `/api/user` | 获取当前用户信息 | 需要登录（未登录返回 401 JSON） |
+| POST | `/api/logout` | 登出（清除登录 Cookie） | 需要登录（需 CSRF） |
 | GET | `/api/motd` | 获取启用的每日消息 | 公开 |
 | GET | `/api/versions` | 获取游戏版本列表 | 公开 |
 | `/{path}` | SPA 路由回退 | 前端路由 | 公开 |
 
 ### 安全模型
 
-- **CSRF**: 启用 CookieCsrfTokenRepository（`XSRF-TOKEN` cookie），前端读取后通过 `X-XSRF-TOKEN` 头发送
-- **OAuth2 认证**: smbx.world 作为 OAuth2 Provider，授权码模式，scope 为 `user.read`，`user-name-attribute` 为 `username`
+- **CSRF**: 启用 CookieCsrfTokenRepository（`XSRF-TOKEN` cookie），前端读取后通过 `X-XSRF-TOKEN` 头发送；首次登录前可先请求 `/api/auth/csrf`
+- **Flarum 认证**: 后端用用户名/邮箱 + 密码调用 `POST {FLARUM_BASE_URL}/api/token`，再请求 `GET /api/users/{id}` 获取 username、displayName、avatarUrl
+- **登录态**: HS256 签名的 JWT 存入 HttpOnly Cookie（`ws_auth`），默认 90 天，无 Session、无 Redis；退出登录仅清除浏览器 Cookie
 - **授权**: 地图增删改操作校验 `principal.id == worldMap.uploader || isAdmin`，非上传者且非管理员返回 403
-- **管理员**: 通过 `worldstation.admin.ids` 配置管理员用户 ID 列表，管理员可编辑/删除任意地图
-- **登出**: `POST /api/logout` 清除 session、authentication 和 cookies，前端通过 `fetch` + `keepalive` 调用
+- **管理员**: 通过 `worldstation.admin.ids` 配置 Flarum uid 列表，管理员可编辑/删除任意地图
+- **登出**: `POST /api/logout` 由 Spring Security LogoutFilter 处理，清除 `ws_auth` Cookie
 - **Forward Headers**: `server.forward-headers-strategy: native`，适配反向代理场景
 
 ### 文件上传流程
@@ -224,8 +240,11 @@ docker compose up -d
 | `SPRING_DATASOURCE_URL` | JDBC 连接串 |
 | `SPRING_DATASOURCE_USERNAME` | 数据库用户名 |
 | `SPRING_DATASOURCE_PASSWORD` | 数据库密码 |
-| `OAUTH2_CLIENT_ID` | OAuth2 客户端 ID |
-| `OAUTH2_CLIENT_SECRET` | OAuth2 客户端密钥 |
+| `FLARUM_BASE_URL` | Flarum 论坛根地址（默认 `https://smbx.world`） |
+| `AUTH_JWT_SECRET` | JWT 签名密钥，至少 32 字节，生产必须设置 |
+| `AUTH_COOKIE_NAME` | 登录态 Cookie 名称（默认 `ws_auth`） |
+| `AUTH_COOKIE_SECURE` | 是否仅 HTTPS 发送 Cookie（本地 HTTP 需 `false`） |
+| `AUTH_COOKIE_SAME_SITE` | Cookie SameSite（默认 `Lax`） |
 | `SWAGGER_UI_ENABLED` | 是否启用 Swagger UI（`/docs`） |
 | `S3_ENDPOINT` | S3 API endpoint |
 | `S3_REGION` | S3 签名 region |
@@ -246,7 +265,7 @@ docker compose up -d
 cd web && npm run dev
 ```
 
-Vite 开发服务器已配置代理：`/api`、`/login`、`/oauth2` → `http://localhost:8080`
+Vite 开发服务器已配置代理：`/api` → `http://localhost:8080`
 
 ## 代码风格约定
 

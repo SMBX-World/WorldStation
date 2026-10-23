@@ -2,22 +2,16 @@
 
 import UserAvatar from "./UserAvatar.vue";
 import {useUserIdStore} from "../stores/userId.js";
-import {getXsrfToken} from "../utils.js";
 
 const userIdStore = useUserIdStore()
 
-function logout() {
-  // keepalive 确保页面跳转后请求不被中断
-  fetch("/api/logout", {
-    method: "POST",
-    headers: {
-      "X-XSRF-TOKEN": getXsrfToken(),
-    },
-    keepalive: true,
-    redirect: "manual",
-  })
-  userIdStore.clearUserId()
-  window.location.href = "/"
+async function logout() {
+  try {
+    await userIdStore.logout()
+    window.location.href = "/"
+  } catch (error) {
+    alert(error.message || "退出登录失败，请稍后重试")
+  }
 }
 </script>
 

@@ -208,7 +208,7 @@ function deleteMap() {
   <div v-else>
     <Semisolid color="red">
       <strong class="flex-row gap-small center"><img src="/static/apply-changed.png" alt="error icon" class="img16"/>无法编辑地图信息</strong>
-      <p v-if="userIdStore.userId === -1">你尚未登录，请先登录后再尝试。</p>
+      <p v-if="userIdStore.userId === -1">你尚未登录，请先<a class="login-link" @click="userIdStore.openLogin()">登录</a>后再尝试。</p>
       <p v-else>你无权编辑此地图的信息，可能的原因包括但不限于：<br/>1. 该地图并非由你上传；<br/>2. 地图不存在或已被删除。
       </p>
     </Semisolid>

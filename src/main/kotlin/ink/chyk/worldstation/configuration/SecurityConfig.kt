@@ -1,33 +1,40 @@
 package ink.chyk.worldstation.configuration
 
-import org.springframework.context.annotation.*
+import ink.chyk.worldstation.auth.AuthCookieService
+import ink.chyk.worldstation.auth.JsonAccessDeniedHandler
+import ink.chyk.worldstation.auth.JsonAuthenticationEntryPoint
+import ink.chyk.worldstation.auth.JwtAuthenticationFilter
+import ink.chyk.worldstation.auth.JwtService
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Configuration
 import org.springframework.http.HttpMethod
-import org.springframework.beans.factory.ObjectProvider
-import org.springframework.security.config.annotation.web.builders.*
-import org.springframework.security.config.annotation.web.configuration.*
-import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository
-import org.springframework.security.web.SecurityFilterChain
+import org.springframework.http.HttpStatus
+import org.springframework.security.config.annotation.web.builders.HttpSecurity
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity
 import org.springframework.security.config.annotation.web.invoke
+import org.springframework.security.config.http.SessionCreationPolicy
+import org.springframework.security.web.SecurityFilterChain
+import org.springframework.security.web.authentication.logout.HttpStatusReturningLogoutSuccessHandler
+import org.springframework.security.web.authentication.logout.LogoutHandler
+import org.springframework.security.web.context.SecurityContextHolderFilter
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher
 
-
-
 @Configuration
 @EnableWebSecurity
-class SecurityConfig {
+class SecurityConfig(
+    private val jwtService: JwtService,
+    private val authCookieService: AuthCookieService,
+    private val jsonAuthenticationEntryPoint: JsonAuthenticationEntryPoint,
+    private val jsonAccessDeniedHandler: JsonAccessDeniedHandler,
+) {
     companion object {
         val DEBUG_DISABLE_WEB_SECURITY = false
     }
 
     @Bean
-    fun securityFilterChain(
-        http: HttpSecurity,
-        clientRegistrationRepository: ObjectProvider<ClientRegistrationRepository>
-    ): SecurityFilterChain {
-        // fixes from https://stackoverflow.com/questions/74447118/csrf-protection-not-working-with-spring-security-6
-
+    fun securityFilterChain(http: HttpSecurity): SecurityFilterChain {
         // 修复 Spring Security 6 中，默认不提供 CSRF 令牌的问题
         val requestHandler = CsrfTokenRequestAttributeHandler()
         requestHandler.setCsrfRequestAttributeName(null)
@@ -36,6 +43,9 @@ class SecurityConfig {
             csrf {
                 csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse()
                 csrfTokenRequestHandler = requestHandler
+            }
+            sessionManagement {
+                sessionCreationPolicy = SessionCreationPolicy.STATELESS
             }
             authorizeHttpRequests {
                 val authenticated2 = if (DEBUG_DISABLE_WEB_SECURITY) {
@@ -51,27 +61,30 @@ class SecurityConfig {
                 authorize("/static-*.bundle", permitAll)
                 authorize("/static/**", permitAll)
                 authorize("/assets/**", permitAll)
+                authorize("/upload/**", permitAll)
+                authorize("/edit", permitAll)
+                authorize("/api/auth/login", permitAll)
+                authorize("/api/auth/csrf", permitAll)
                 authorize(PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.GET, "/api/worldmaps"), permitAll)
                 authorize(PathPatternRequestMatcher.withDefaults().matcher(HttpMethod.GET, "/api/versions"), permitAll)
                 authorize("/api/motd", permitAll)
-                authorize("/login/**", permitAll)
-                authorize("/oauth2/**", permitAll)
                 authorize("/docs/**", permitAll)
-               authorize(anyRequest, authenticated2) // 需要认证的请求
+                authorize(anyRequest, authenticated2)
             }
-            if (!DEBUG_DISABLE_WEB_SECURITY && clientRegistrationRepository.getIfAvailable() != null) {
-                oauth2Login {
-                    defaultSuccessUrl("/", true)
-                }
+            exceptionHandling {
+                authenticationEntryPoint = jsonAuthenticationEntryPoint
+                accessDeniedHandler = jsonAccessDeniedHandler
             }
             logout {
                 logoutUrl = "/api/logout"
-                logoutSuccessUrl = "/"
-                invalidateHttpSession = true
-                clearAuthentication = true
-                deleteCookies("JSESSIONID", "XSRF-TOKEN")
+                addLogoutHandler(LogoutHandler { _, response, _ -> authCookieService.clear(response) })
+                logoutSuccessHandler = HttpStatusReturningLogoutSuccessHandler(HttpStatus.OK)
             }
         }
+        http.addFilterAfter(
+            JwtAuthenticationFilter(jwtService, authCookieService),
+            SecurityContextHolderFilter::class.java,
+        )
         return http.build()
     }
 }

@@ -1,5 +1,6 @@
 package ink.chyk.worldstation.controller
 
+import ink.chyk.worldstation.auth.FlarumPrincipal
 import ink.chyk.worldstation.configuration.AdminConfig
 import ink.chyk.worldstation.dto.*
 import ink.chyk.worldstation.enum.GameVersion
@@ -7,7 +8,6 @@ import ink.chyk.worldstation.repository.WorldMapRepository
 import ink.chyk.worldstation.service.StorageDeleteResult
 import ink.chyk.worldstation.service.StorageService
 import org.springframework.security.core.annotation.AuthenticationPrincipal
-import org.springframework.security.oauth2.core.user.OAuth2User
 import org.springframework.web.bind.annotation.*
 
 @RestController
@@ -25,10 +25,10 @@ class WorldMapController(
     @PutMapping
     fun updateWorldMap(
         @RequestBody worldMapDTO: WorldMapDTO,
-        @AuthenticationPrincipal principal: OAuth2User
+        @AuthenticationPrincipal principal: FlarumPrincipal
     ): ApiResponseDTO<Boolean> {
         // 比对上传者（管理员可编辑任意地图）
-        val currentUserId = principal.getAttribute<Int>("id") ?: return ApiResponseDTO(code = 403, message = "您没有权限修改该地图信息")
+        val currentUserId = principal.id
         if (worldMapDTO.uploader != currentUserId && !isAdmin(currentUserId)) {
             return ApiResponseDTO(code = 403, message = "您没有权限修改该地图信息")
         }
@@ -89,11 +89,11 @@ class WorldMapController(
     @DeleteMapping("/worldmap/{id}")
     fun deleteWorldMap(
         @PathVariable id: Int,
-        @AuthenticationPrincipal principal: OAuth2User
+        @AuthenticationPrincipal principal: FlarumPrincipal
     ): ApiResponseDTO<Boolean> {
         val map = repository.getWorldMapById(id)
             ?: return ApiResponseDTO(code = 404, message = "请求的地图不存在")
-        val currentUserId = principal.getAttribute<Int>("id") ?: return ApiResponseDTO(code = 403, message = "您没有权限删除该地图")
+        val currentUserId = principal.id
         // 检查地图是否属于当前用户或当前用户是管理员
         if (map.uploader != currentUserId && !isAdmin(currentUserId)) {
             return ApiResponseDTO(code = 403, message = "您没有权限删除该地图")

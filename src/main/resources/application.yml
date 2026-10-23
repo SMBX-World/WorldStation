@@ -35,6 +35,18 @@ server:
     max-swallow-size: -1
 
 worldstation:
+  flarum:
+    base-url: ${FLARUM_BASE_URL:https://smbx.world}
+    connect-timeout: 5s
+    read-timeout: 10s
+  auth:
+    jwt-secret: ${AUTH_JWT_SECRET:}
+    session-ttl: 90d
+    cookie-name: ${AUTH_COOKIE_NAME:ws_auth}
+    cookie-secure: ${AUTH_COOKIE_SECURE:true}
+    cookie-same-site: ${AUTH_COOKIE_SAME_SITE:Lax}
+    max-login-failures: 10
+    failure-window: 10m
   admin:
     ids: [1, 3, 6]
   upload:

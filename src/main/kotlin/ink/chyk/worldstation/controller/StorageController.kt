@@ -1,5 +1,6 @@
 package ink.chyk.worldstation.controller
 
+import ink.chyk.worldstation.auth.FlarumPrincipal
 import ink.chyk.worldstation.dto.ApiResponseDTO
 import ink.chyk.worldstation.dto.CreateChunkedUploadRequestDTO
 import ink.chyk.worldstation.enum.ChunkedUploadStatus
@@ -14,7 +15,6 @@ import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
-import org.springframework.security.oauth2.core.user.OAuth2User
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -42,7 +42,7 @@ class StorageController(
     fun uploadFileStream(
         @RequestParam("upload_kind") uploadKind: UploadFileKind,
         @RequestParam("file_name") fileName: String,
-        @AuthenticationPrincipal principal: OAuth2User,
+        @AuthenticationPrincipal principal: FlarumPrincipal,
         @RequestHeader("Content-Type") contentType: String,
         @RequestHeader("Content-Length") contentLength: Long,
         inputStream: InputStream,
@@ -60,7 +60,7 @@ class StorageController(
     @PostMapping("/uploads")
     fun createChunkedUpload(
         @RequestBody request: CreateChunkedUploadRequestDTO,
-        @AuthenticationPrincipal principal: OAuth2User,
+        @AuthenticationPrincipal principal: FlarumPrincipal,
     ): ResponseEntity<ApiResponseDTO<Any>> = handleChunkedUploadCall {
         ResponseEntity.ok(
             ApiResponseDTO(
@@ -74,7 +74,7 @@ class StorageController(
     fun uploadChunk(
         @PathVariable uploadId: UUID,
         @PathVariable chunkIndex: Int,
-        @AuthenticationPrincipal principal: OAuth2User,
+        @AuthenticationPrincipal principal: FlarumPrincipal,
         @RequestHeader("Content-Length") contentLength: Long,
         @RequestHeader("Content-Range") contentRange: String,
         @RequestHeader("X-Chunk-SHA256") sha256: String,
@@ -93,7 +93,7 @@ class StorageController(
     @GetMapping("/uploads/{uploadId}")
     fun getChunkedUpload(
         @PathVariable uploadId: UUID,
-        @AuthenticationPrincipal principal: OAuth2User,
+        @AuthenticationPrincipal principal: FlarumPrincipal,
     ): ResponseEntity<ApiResponseDTO<Any>> = handleChunkedUploadCall {
         ResponseEntity.ok(
             ApiResponseDTO(
@@ -106,7 +106,7 @@ class StorageController(
     @PostMapping("/uploads/{uploadId}/complete")
     fun completeChunkedUpload(
         @PathVariable uploadId: UUID,
-        @AuthenticationPrincipal principal: OAuth2User,
+        @AuthenticationPrincipal principal: FlarumPrincipal,
     ): ResponseEntity<ApiResponseDTO<Any>> = handleChunkedUploadCall {
         val dto = chunkedUploadService.completeUpload(uploadId, principal)
         val status = if (dto.status == ChunkedUploadStatus.COMPLETED) HttpStatus.OK else HttpStatus.ACCEPTED
@@ -125,7 +125,7 @@ class StorageController(
     @DeleteMapping("/uploads/{uploadId}")
     fun abortChunkedUpload(
         @PathVariable uploadId: UUID,
-        @AuthenticationPrincipal principal: OAuth2User,
+        @AuthenticationPrincipal principal: FlarumPrincipal,
     ): ResponseEntity<ApiResponseDTO<Any>> = handleChunkedUploadCall {
         chunkedUploadService.abort(uploadId, principal)
         ResponseEntity.ok(ApiResponseDTO(message = "上传已取消"))

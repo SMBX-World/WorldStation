@@ -11,23 +11,6 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME}
     password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
-  security:
-    oauth2:
-      client:
-        registration:
-          smbx-world:
-            client-id: ${OAUTH2_CLIENT_ID}
-            client-secret: ${OAUTH2_CLIENT_SECRET}
-            authorization-grant-type: authorization_code
-            scope: "user.read"
-            redirect-uri: "https://station.smbx.world/login/oauth2/code/{registrationId}"
-        provider:
-          smbx-world:
-            authorization-uri: https://smbx.world/oauth/authorize
-            token-uri: https://smbx.world/oauth/token
-            user-info-uri: https://smbx.world/api/user
-            user-name-attribute: username
-
 springdoc:
   api-docs:
     enabled: true
@@ -39,6 +22,18 @@ springdoc:
       cookie-name: "XSRF-TOKEN"
 
 worldstation:
+  flarum:
+    base-url: ${FLARUM_BASE_URL}
+    connect-timeout: 5s
+    read-timeout: 10s
+  auth:
+    jwt-secret: ${AUTH_JWT_SECRET}
+    session-ttl: 90d
+    cookie-name: ${AUTH_COOKIE_NAME}
+    cookie-secure: ${AUTH_COOKIE_SECURE}
+    cookie-same-site: ${AUTH_COOKIE_SAME_SITE}
+    max-login-failures: 10
+    failure-window: 10m
   storage:
     s3:
       endpoint: ${S3_ENDPOINT}

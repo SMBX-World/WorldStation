@@ -1,5 +1,6 @@
 package ink.chyk.worldstation.service
 
+import ink.chyk.worldstation.auth.FlarumPrincipal
 import ink.chyk.worldstation.configuration.S3StorageConfig
 import ink.chyk.worldstation.configuration.S3StorageProperties
 import ink.chyk.worldstation.enum.UploadFileKind
@@ -8,8 +9,6 @@ import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.springframework.security.core.authority.SimpleGrantedAuthority
-import org.springframework.security.oauth2.core.user.DefaultOAuth2User
 import org.testcontainers.containers.GenericContainer
 import org.testcontainers.containers.wait.strategy.Wait
 import org.testcontainers.junit.jupiter.Container
@@ -68,11 +67,7 @@ class S3StorageIntegrationTests {
 
     @Test
     fun `upload and delete object against MinIO`() {
-        val principal = DefaultOAuth2User(
-            listOf(SimpleGrantedAuthority("ROLE_USER")),
-            mapOf("id" to 7, "username" to "tester"),
-            "username",
-        )
+        val principal = FlarumPrincipal(7, "tester", "tester")
         val content = "integration test".toByteArray()
         val prepared = service.prepareUpload(
             UploadFileKind.PICBED,

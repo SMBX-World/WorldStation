@@ -38,16 +38,7 @@ export default defineConfig({
         changeOrigin: true,
         cookieDomainRewrite: 'localhost'
       },
-      '/login': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-        cookieDomainRewrite: 'localhost'
-      },
-      '/oauth2': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-        cookieDomainRewrite: 'localhost'
-      }
+
     }
   },
   build: {

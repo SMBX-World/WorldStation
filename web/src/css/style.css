@@ -140,6 +140,11 @@ a:hover {
   color: inherit;
 }
 
+.login-link {
+  text-decoration: underline;
+  font-weight: 600;
+}
+
 
 .center {
   justify-content: center;

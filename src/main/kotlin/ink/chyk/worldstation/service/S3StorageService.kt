@@ -1,11 +1,11 @@
 package ink.chyk.worldstation.service
 
+import ink.chyk.worldstation.auth.FlarumPrincipal
 import ink.chyk.worldstation.configuration.S3StorageProperties
 import ink.chyk.worldstation.enum.UploadFileKind
 import ink.chyk.worldstation.util.ContentTypeUtils
 import org.apache.tomcat.util.http.fileupload.impl.FileSizeLimitExceededException
 import org.slf4j.LoggerFactory
-import org.springframework.security.oauth2.core.user.OAuth2User
 import org.springframework.stereotype.Service
 import software.amazon.awssdk.core.sync.RequestBody
 import software.amazon.awssdk.services.s3.S3Client
@@ -31,7 +31,7 @@ class S3StorageService(
     override fun prepareUpload(
         uploadKind: UploadFileKind,
         fileName: String,
-        principal: OAuth2User,
+        principal: FlarumPrincipal,
         contentType: String?,
         contentLength: Long,
     ): Result<PreparedStorageUpload> {
@@ -67,7 +67,7 @@ class S3StorageService(
     override fun uploadFileStream(
         uploadKind: UploadFileKind,
         fileName: String,
-        principal: OAuth2User,
+        principal: FlarumPrincipal,
         contentType: String?,
         contentLength: Long,
         inputStream: InputStream,
@@ -123,7 +123,7 @@ class S3StorageService(
         }
     }
 
-    private fun objectKey(uploadKind: UploadFileKind, fileName: String, principal: OAuth2User): String {
+    private fun objectKey(uploadKind: UploadFileKind, fileName: String, principal: FlarumPrincipal): String {
         return when (uploadKind) {
             UploadFileKind.WORLDMAP -> {
                 val title = fileName.substringAfter(']').trim()
@@ -139,9 +139,7 @@ class S3StorageService(
             }
 
             UploadFileKind.PICBED -> {
-                val userId = principal.getAttribute<Any>("id")
-                    ?: throw IllegalArgumentException("无法获取上传者 ID")
-                "${normalizePrefix(properties.picbedPrefix)}/picbed_$userId/$fileName"
+                "${normalizePrefix(properties.picbedPrefix)}/picbed_${principal.id}/$fileName"
             }
         }
     }

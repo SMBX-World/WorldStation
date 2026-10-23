@@ -1,7 +1,7 @@
 package ink.chyk.worldstation.service
 
+import ink.chyk.worldstation.auth.FlarumPrincipal
 import ink.chyk.worldstation.enum.UploadFileKind
-import org.springframework.security.oauth2.core.user.OAuth2User
 import java.io.InputStream
 
 data class PreparedStorageUpload(
@@ -21,7 +21,7 @@ interface StorageService {
     fun prepareUpload(
         uploadKind: UploadFileKind,
         fileName: String,
-        principal: OAuth2User,
+        principal: FlarumPrincipal,
         contentType: String?,
         contentLength: Long,
     ): Result<PreparedStorageUpload>
@@ -29,7 +29,7 @@ interface StorageService {
     fun uploadFileStream(
         uploadKind: UploadFileKind,
         fileName: String,
-        principal: OAuth2User,
+        principal: FlarumPrincipal,
         contentType: String?,
         contentLength: Long,
         inputStream: InputStream,

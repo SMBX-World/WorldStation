@@ -189,7 +189,7 @@ function startUpload() {
   <div class="upload-image-view" v-else>
     <Semisolid color="blue">
       <strong>上传地图</strong>
-      <p>请先登录后，再使用本功能。</p>
+      <p>请先<a class="login-link" @click="userIdStore.openLogin()">登录</a>后，再使用本功能。</p>
     </Semisolid>
   </div>
 </template>

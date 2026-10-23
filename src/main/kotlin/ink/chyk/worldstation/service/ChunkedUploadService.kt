@@ -1,5 +1,6 @@
 package ink.chyk.worldstation.service
 
+import ink.chyk.worldstation.auth.FlarumPrincipal
 import ink.chyk.worldstation.configuration.UploadConfig
 import ink.chyk.worldstation.dto.ChunkUploadDTO
 import ink.chyk.worldstation.dto.ChunkedUploadDTO
@@ -10,7 +11,6 @@ import ink.chyk.worldstation.repository.UploadSessionRecord
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.scheduling.annotation.Scheduled
-import org.springframework.security.oauth2.core.user.OAuth2User
 import org.springframework.stereotype.Service
 import java.io.InputStream
 import java.io.IOException
@@ -47,14 +47,14 @@ class ChunkedUploadService(
 
     fun createSession(
         request: CreateChunkedUploadRequestDTO,
-        principal: OAuth2User,
+        principal: FlarumPrincipal,
     ): ChunkedUploadDTO {
         if (request.totalSize <= 0) {
             throw ChunkedUploadException("文件大小不正确")
         }
 
         val fileName = cleanFileName(request.fileName)
-        val userId = principal.getAttribute<Any>("id").toString().toInt()
+        val userId = principal.id
         val activeCount = repository.countActiveSessionsForUser(
             userId,
             listOf(
@@ -111,7 +111,7 @@ class ChunkedUploadService(
         contentRange: String,
         sha256: String,
         inputStream: InputStream,
-        principal: OAuth2User,
+        principal: FlarumPrincipal,
     ): ChunkUploadDTO {
         val session = getOwnedSession(uploadId, principal)
         if (session.status in listOf(ChunkedUploadStatus.COMPLETED, ChunkedUploadStatus.ABORTED, ChunkedUploadStatus.EXPIRED)) {
@@ -153,7 +153,7 @@ class ChunkedUploadService(
         )
     }
 
-    fun completeUpload(uploadId: UUID, principal: OAuth2User): ChunkedUploadDTO {
+    fun completeUpload(uploadId: UUID, principal: FlarumPrincipal): ChunkedUploadDTO {
         val session = getOwnedSession(uploadId, principal)
         val contiguous = repository.countContiguousChunks(uploadId)
         if (contiguous < session.totalChunks) {
@@ -166,11 +166,11 @@ class ChunkedUploadService(
         return getSessionDTO(uploadId, principal)
     }
 
-    fun getSessionDTO(uploadId: UUID, principal: OAuth2User): ChunkedUploadDTO {
+    fun getSessionDTO(uploadId: UUID, principal: FlarumPrincipal): ChunkedUploadDTO {
         return getOwnedSession(uploadId, principal).toDTO()
     }
 
-    fun abort(uploadId: UUID, principal: OAuth2User) {
+    fun abort(uploadId: UUID, principal: FlarumPrincipal) {
         val session = getOwnedSession(uploadId, principal)
         repository.updateStatus(uploadId, ChunkedUploadStatus.ABORTED)
         deleteDirectory(Path.of(session.tempDir))
@@ -312,10 +312,10 @@ class ChunkedUploadService(
         }
     }
 
-    private fun getOwnedSession(uploadId: UUID, principal: OAuth2User): UploadSessionRecord {
+    private fun getOwnedSession(uploadId: UUID, principal: FlarumPrincipal): UploadSessionRecord {
         val session = repository.getSession(uploadId)
             ?: throw ChunkedUploadException("上传会话不存在")
-        val userId = principal.getAttribute<Any>("id").toString().toInt()
+        val userId = principal.id
         if (session.userId != userId) {
             throw ChunkedUploadException("无权访问该上传会话")
         }
