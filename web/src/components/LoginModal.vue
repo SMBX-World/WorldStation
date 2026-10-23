@@ -65,7 +65,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
 
         <Semisolid color="blue">
           <strong class="flex-row gap-small">
-            <img src="/static/smbx-world.png" alt="SMBX World" class="img16"/>
+            <img src="/static/to-picbed.png" alt="SMBX World" class="img16"/>
             使用 SMBX World 社区账号登录
           </strong>
           <p>输入你在 SMBX World 论坛的用户名（或注册邮箱）和密码。</p>
