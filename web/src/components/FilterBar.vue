@@ -79,10 +79,6 @@ function setChanged() {
         <img class="img16" src="/static/to-picbed.png" alt="上传图片"/>
         <strong>上传图片</strong>
       </a>
-      <a v-if="!isLoggedIn" class="flex-row gap-small" @click="userIdStore.openLogin()">
-        <img class="img16" src="/static/door.png" alt="登录"/>
-        <strong>登录</strong>
-      </a>
       <span v-if="isLoggedIn">|</span>
       <span class="flex-row gap-small">
         <img class="img16" src="/static/pipe.png" alt="筛选"/>
